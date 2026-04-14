@@ -19,6 +19,7 @@ export default function App() {
     addCategory,
     updateCategory,
     deleteCategory,
+    moveCategory,
     addMod,
     updateMod,
     deleteMod,
@@ -46,7 +47,7 @@ export default function App() {
 
   if (loading && cars.length === 0) {
     return (
-      <div className="min-h-screen bg-[#080808] flex items-center justify-center">
+      <div className="min-h-screen bg-[#080808] pt-[env(safe-area-inset-top)] flex items-center justify-center">
         <div className="flex items-center gap-3 text-gray-500">
           <Loader2 size={18} className="animate-spin" />
           <span className="text-sm">Loading builds...</span>
@@ -57,7 +58,7 @@ export default function App() {
 
   if (error && cars.length === 0 && !selectedCar) {
     return (
-      <div className="min-h-screen bg-[#080808] text-white flex items-center justify-center px-4">
+      <div className="min-h-screen bg-[#080808] pt-[env(safe-area-inset-top)] text-white flex items-center justify-center px-4">
         <div className="w-full max-w-xl rounded-xl border border-red-900/50 bg-[#111111] p-5">
           <p className="text-red-400 font-semibold mb-2">Configuration error</p>
           <p className="text-sm text-gray-300">{error}</p>
@@ -67,7 +68,7 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#080808] text-white">
+    <div className="min-h-screen bg-[#080808] pt-[env(safe-area-inset-top)] text-white">
       <div className="max-w-6xl mx-auto px-4 py-6 md:py-10">
         <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start">
           <Sidebar
@@ -92,10 +93,16 @@ export default function App() {
                 />
 
                 <div className="space-y-3 pt-2">
-                  {selectedCar.categories.map((cat) => (
+                  {selectedCar.categories.map((cat, index) => (
                     <CategorySection
                       key={cat.id}
                       category={cat}
+                      canMoveUp={index > 0}
+                      canMoveDown={index < selectedCar.categories.length - 1}
+                      onMoveUp={(id) => moveCategory(selectedCar.id, id, "up")}
+                      onMoveDown={(id) =>
+                        moveCategory(selectedCar.id, id, "down")
+                      }
                       onUpdateCategory={(id, name) =>
                         updateCategory(id, name, selectedCar.id)
                       }

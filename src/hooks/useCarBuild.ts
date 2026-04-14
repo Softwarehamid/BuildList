@@ -244,6 +244,49 @@ export function useCarBuild() {
     [fetchCarDetails, getClient],
   );
 
+  const moveCategory = useCallback(
+    async (carId: string, categoryId: string, direction: "up" | "down") => {
+      const client = getClient();
+      if (!client || !selectedCar || selectedCar.id !== carId) return;
+
+      const orderedCategories = [...selectedCar.categories].sort(
+        (a, b) => a.display_order - b.display_order,
+      );
+
+      const currentIndex = orderedCategories.findIndex(
+        (category) => category.id === categoryId,
+      );
+      if (currentIndex === -1) return;
+
+      const targetIndex =
+        direction === "up" ? currentIndex - 1 : currentIndex + 1;
+      if (targetIndex < 0 || targetIndex >= orderedCategories.length) return;
+
+      const currentCategory = orderedCategories[currentIndex];
+      const targetCategory = orderedCategories[targetIndex];
+
+      const updates = [
+        { id: currentCategory.id, display_order: targetCategory.display_order },
+        { id: targetCategory.id, display_order: currentCategory.display_order },
+      ];
+
+      for (const update of updates) {
+        const { error } = await client
+          .from("mod_categories")
+          .update({ display_order: update.display_order })
+          .eq("id", update.id);
+
+        if (error) {
+          setError(error.message);
+          return;
+        }
+      }
+
+      await fetchCarDetails(carId);
+    },
+    [fetchCarDetails, getClient, selectedCar],
+  );
+
   const addMod = useCallback(
     async (mod: Omit<Mod, "id" | "created_at">, carId: string) => {
       const client = getClient();
@@ -301,6 +344,7 @@ export function useCarBuild() {
     addCategory,
     updateCategory,
     deleteCategory,
+    moveCategory,
     addMod,
     updateMod,
     deleteMod,
