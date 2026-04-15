@@ -16,6 +16,7 @@ import { formatPrice, calcTotal } from "../lib/utils";
 
 interface Props {
   category: CategoryWithMods;
+  displayName?: string;
   canMoveUp: boolean;
   canMoveDown: boolean;
   onMoveUp: (id: string) => void;
@@ -51,6 +52,7 @@ function getCategoryColor(name: string): string {
 
 export function CategorySection({
   category,
+  displayName,
   canMoveUp,
   canMoveDown,
   onMoveUp,
@@ -130,7 +132,7 @@ export function CategorySection({
           />
         ) : (
           <span className="flex-1 text-white font-semibold text-sm tracking-wide">
-            {category.name}
+            {displayName ?? category.name}
           </span>
         )}
 

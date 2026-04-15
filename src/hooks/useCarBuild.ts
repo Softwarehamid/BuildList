@@ -43,6 +43,20 @@ export function useCarBuild() {
     return data;
   }, [getClient]);
 
+  function getPowerStageNumber(name: string): number | null {
+    const stageMatch = name.match(/^stage\s*(\d+)$/i);
+    if (stageMatch) return Number.parseInt(stageMatch[1], 10);
+
+    const legacyMatch = name.match(/^power\s*-\s*stage\s*(\d+)$/i);
+    if (legacyMatch) return Number.parseInt(legacyMatch[1], 10);
+
+    return null;
+  }
+
+  function isPowerStageCategory(name: string): boolean {
+    return getPowerStageNumber(name) !== null;
+  }
+
   const fetchCarDetails = useCallback(
     async (carId: string) => {
       const client = getClient();
@@ -214,10 +228,7 @@ export function useCarBuild() {
       if (!client || !selectedCar || selectedCar.id !== carId) return;
 
       const stageNumbers = selectedCar.categories
-        .map((category) => {
-          const match = category.name.match(/^power\s*-\s*stage\s*(\d+)$/i);
-          return match ? Number.parseInt(match[1], 10) : 0;
-        })
+        .map((category) => getPowerStageNumber(category.name) ?? 0)
         .filter((num) => num > 0);
 
       const nextStage =
@@ -230,13 +241,96 @@ export function useCarBuild() {
 
       const { error } = await client.from("mod_categories").insert({
         car_id: carId,
-        name: `Power - Stage ${nextStage}`,
+        name: `Stage ${nextStage}`,
         display_order: maxOrder + 1,
       });
 
       if (error) {
         setError(error.message);
         return;
+      }
+
+      await fetchCarDetails(carId);
+    },
+    [fetchCarDetails, getClient, selectedCar],
+  );
+
+  const movePowerGroup = useCallback(
+    async (carId: string, direction: "up" | "down") => {
+      const client = getClient();
+      if (!client || !selectedCar || selectedCar.id !== carId) return;
+
+      const ordered = [...selectedCar.categories].sort(
+        (a, b) => a.display_order - b.display_order,
+      );
+      const powerStageIds = new Set(
+        ordered
+          .filter((category) => isPowerStageCategory(category.name))
+          .map((category) => category.id),
+      );
+
+      if (powerStageIds.size === 0) return;
+
+      const powerStageCategories = ordered.filter((category) =>
+        powerStageIds.has(category.id),
+      );
+
+      const units: Array<{ type: "regular"; id: string } | { type: "power" }> =
+        [];
+      let insertedPowerUnit = false;
+
+      for (const category of ordered) {
+        if (powerStageIds.has(category.id)) {
+          if (!insertedPowerUnit) {
+            units.push({ type: "power" });
+            insertedPowerUnit = true;
+          }
+          continue;
+        }
+
+        units.push({ type: "regular", id: category.id });
+      }
+
+      const powerIndex = units.findIndex((unit) => unit.type === "power");
+      if (powerIndex === -1) return;
+
+      const targetIndex = direction === "up" ? powerIndex - 1 : powerIndex + 1;
+      if (targetIndex < 0 || targetIndex >= units.length) return;
+
+      const nextUnits = [...units];
+      [nextUnits[powerIndex], nextUnits[targetIndex]] = [
+        nextUnits[targetIndex],
+        nextUnits[powerIndex],
+      ];
+
+      const orderedPowerStages = [...powerStageCategories].sort((a, b) => {
+        const aNum = getPowerStageNumber(a.name) ?? Number.MAX_SAFE_INTEGER;
+        const bNum = getPowerStageNumber(b.name) ?? Number.MAX_SAFE_INTEGER;
+        if (aNum !== bNum) return aNum - bNum;
+        return a.display_order - b.display_order;
+      });
+
+      const reorderedCategoryIds: string[] = [];
+      for (const unit of nextUnits) {
+        if (unit.type === "regular") {
+          reorderedCategoryIds.push(unit.id);
+        } else {
+          reorderedCategoryIds.push(
+            ...orderedPowerStages.map((category) => category.id),
+          );
+        }
+      }
+
+      for (let index = 0; index < reorderedCategoryIds.length; index += 1) {
+        const { error } = await client
+          .from("mod_categories")
+          .update({ display_order: index + 1 })
+          .eq("id", reorderedCategoryIds[index]);
+
+        if (error) {
+          setError(error.message);
+          return;
+        }
       }
 
       await fetchCarDetails(carId);
@@ -429,6 +523,7 @@ export function useCarBuild() {
     deleteCar,
     addCategory,
     addPowerStage,
+    movePowerGroup,
     updateCategory,
     deleteCategory,
     moveCategory,

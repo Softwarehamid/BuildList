@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { Plus, Loader2, ChevronDown, ChevronRight, Zap } from "lucide-react";
+import {
+  Plus,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  Zap,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
 import { useCarBuild } from "./hooks/useCarBuild";
 import { Sidebar } from "./components/Sidebar";
 import { CarHeader } from "./components/CarHeader";
@@ -7,7 +15,17 @@ import { CategorySection } from "./components/CategorySection";
 import type { Mod } from "./types/database";
 
 function isPowerStageCategory(name: string): boolean {
-  return /^power\s*-\s*stage\s*\d+$/i.test(name);
+  return /^stage\s*\d+$/i.test(name) || /^power\s*-\s*stage\s*\d+$/i.test(name);
+}
+
+function getPowerStageNumber(name: string): number | null {
+  const stageMatch = name.match(/^stage\s*(\d+)$/i);
+  if (stageMatch) return Number.parseInt(stageMatch[1], 10);
+
+  const legacyMatch = name.match(/^power\s*-\s*stage\s*(\d+)$/i);
+  if (legacyMatch) return Number.parseInt(legacyMatch[1], 10);
+
+  return null;
 }
 
 export default function App() {
@@ -22,6 +40,7 @@ export default function App() {
     deleteCar,
     addCategory,
     addPowerStage,
+    movePowerGroup,
     updateCategory,
     deleteCategory,
     moveCategoryInList,
@@ -64,6 +83,36 @@ export default function App() {
   const regularCategories = orderedCategories.filter(
     (category) => !isPowerStageCategory(category.name),
   );
+
+  const orderedBlocks: Array<
+    { type: "regular"; categoryId: string } | { type: "power" }
+  > = [];
+  let insertedPowerBlock = false;
+
+  for (const category of orderedCategories) {
+    if (isPowerStageCategory(category.name)) {
+      if (!insertedPowerBlock) {
+        orderedBlocks.push({ type: "power" });
+        insertedPowerBlock = true;
+      }
+      continue;
+    }
+
+    orderedBlocks.push({ type: "regular", categoryId: category.id });
+  }
+
+  const regularById = new Map(
+    regularCategories.map((category) => [category.id, category]),
+  );
+  const regularIds = regularCategories.map((category) => category.id);
+  const powerStageIds = powerStages.map((category) => category.id);
+
+  const powerBlockIndex = orderedBlocks.findIndex(
+    (block) => block.type === "power",
+  );
+  const canMovePowerUp = powerBlockIndex > 0;
+  const canMovePowerDown =
+    powerBlockIndex !== -1 && powerBlockIndex < orderedBlocks.length - 1;
 
   const moveInOrderedSet = (
     orderedIds: string[],
@@ -122,122 +171,154 @@ export default function App() {
                 />
 
                 <div className="space-y-3 pt-2">
-                  {regularCategories.map((cat, index) => (
-                    <CategorySection
-                      key={cat.id}
-                      category={cat}
-                      canMoveUp={index > 0}
-                      canMoveDown={index < regularCategories.length - 1}
-                      onMoveUp={(id) =>
-                        moveInOrderedSet(
-                          regularCategories.map((category) => category.id),
-                          id,
-                          "up",
-                        )
-                      }
-                      onMoveDown={(id) =>
-                        moveInOrderedSet(
-                          regularCategories.map((category) => category.id),
-                          id,
-                          "down",
-                        )
-                      }
-                      onUpdateCategory={(id, name) =>
-                        updateCategory(id, name, selectedCar.id)
-                      }
-                      onDeleteCategory={(id) =>
-                        deleteCategory(id, selectedCar.id)
-                      }
-                      onAddMod={(mod: Omit<Mod, "id" | "created_at">) =>
-                        addMod(mod, selectedCar.id)
-                      }
-                      onUpdateMod={(id, updates) =>
-                        updateMod(id, updates, selectedCar.id)
-                      }
-                      onDeleteMod={(id) => deleteMod(id, selectedCar.id)}
-                    />
-                  ))}
+                  {orderedBlocks.map((block, blockIndex) => {
+                    if (block.type === "regular") {
+                      const cat = regularById.get(block.categoryId);
+                      const currentRegularIndex = regularIds.indexOf(
+                        block.categoryId,
+                      );
+                      if (!cat) return null;
 
-                  <section className="bg-[#111111] border border-[#1e1e1e] rounded-xl overflow-hidden">
-                    <div
-                      className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
-                      onClick={() => setPowerOpen((open) => !open)}
-                    >
-                      <div className="w-[3px] h-5 rounded-full flex-shrink-0 bg-[#3b82f6]" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white font-semibold text-sm tracking-wide">
-                          Power
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {powerStages.length}{" "}
-                          {powerStages.length === 1 ? "stage" : "stages"}
-                        </p>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          addPowerStage(selectedCar.id);
-                          setPowerOpen(true);
-                        }}
-                        className="flex items-center gap-1.5 text-xs text-white bg-blue-700 hover:bg-blue-600 px-3 py-1.5 rounded-md transition-colors"
+                      return (
+                        <CategorySection
+                          key={cat.id}
+                          category={cat}
+                          canMoveUp={currentRegularIndex > 0}
+                          canMoveDown={
+                            currentRegularIndex < regularIds.length - 1
+                          }
+                          onMoveUp={(id) =>
+                            moveInOrderedSet(regularIds, id, "up")
+                          }
+                          onMoveDown={(id) =>
+                            moveInOrderedSet(regularIds, id, "down")
+                          }
+                          onUpdateCategory={(id, name) =>
+                            updateCategory(id, name, selectedCar.id)
+                          }
+                          onDeleteCategory={(id) =>
+                            deleteCategory(id, selectedCar.id)
+                          }
+                          onAddMod={(mod: Omit<Mod, "id" | "created_at">) =>
+                            addMod(mod, selectedCar.id)
+                          }
+                          onUpdateMod={(id, updates) =>
+                            updateMod(id, updates, selectedCar.id)
+                          }
+                          onDeleteMod={(id) => deleteMod(id, selectedCar.id)}
+                        />
+                      );
+                    }
+
+                    return (
+                      <section
+                        key={`power-block-${blockIndex}`}
+                        className="bg-[#111111] border border-[#1e1e1e] rounded-xl overflow-hidden"
                       >
-                        <Plus size={12} /> Add Stage
-                      </button>
-                      <Zap size={14} className="text-blue-400" />
-                      {powerOpen ? (
-                        <ChevronDown size={15} className="text-gray-500" />
-                      ) : (
-                        <ChevronRight size={15} className="text-gray-500" />
-                      )}
-                    </div>
+                        <div
+                          className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
+                          onClick={() => setPowerOpen((open) => !open)}
+                        >
+                          <div className="w-[3px] h-5 rounded-full flex-shrink-0 bg-[#3b82f6]" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white font-semibold text-sm tracking-wide">
+                              Power
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {powerStages.length}{" "}
+                              {powerStages.length === 1 ? "stage" : "stages"}
+                            </p>
+                          </div>
+                          <div
+                            className="flex items-center gap-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              onClick={() =>
+                                movePowerGroup(selectedCar.id, "up")
+                              }
+                              className="text-gray-600 hover:text-gray-300 transition-colors p-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
+                              disabled={!canMovePowerUp}
+                              aria-label="Move power section up"
+                            >
+                              <ArrowUp size={12} />
+                            </button>
+                            <button
+                              onClick={() =>
+                                movePowerGroup(selectedCar.id, "down")
+                              }
+                              className="text-gray-600 hover:text-gray-300 transition-colors p-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
+                              disabled={!canMovePowerDown}
+                              aria-label="Move power section down"
+                            >
+                              <ArrowDown size={12} />
+                            </button>
+                            <button
+                              onClick={() => {
+                                addPowerStage(selectedCar.id);
+                                setPowerOpen(true);
+                              }}
+                              className="flex items-center gap-1.5 text-xs text-white bg-blue-700 hover:bg-blue-600 px-3 py-1.5 rounded-md transition-colors"
+                            >
+                              <Plus size={12} /> Add Stage
+                            </button>
+                          </div>
+                          <Zap size={14} className="text-blue-400" />
+                          {powerOpen ? (
+                            <ChevronDown size={15} className="text-gray-500" />
+                          ) : (
+                            <ChevronRight size={15} className="text-gray-500" />
+                          )}
+                        </div>
 
-                    {powerOpen && (
-                      <div className="border-t border-[#1a1a1a] p-2 space-y-2">
-                        {powerStages.length === 0 && (
-                          <p className="text-gray-600 text-xs text-center py-3 italic">
-                            No stages yet. Click Add Stage to create Power -
-                            Stage 1.
-                          </p>
+                        {powerOpen && (
+                          <div className="border-t border-[#1a1a1a] p-2 space-y-2">
+                            {powerStages.length === 0 && (
+                              <p className="text-gray-600 text-xs text-center py-3 italic">
+                                No stages yet. Click Add Stage to create Stage
+                                1.
+                              </p>
+                            )}
+
+                            {powerStages.map((cat, index) => {
+                              const stageNumber =
+                                getPowerStageNumber(cat.name) ?? index + 1;
+                              return (
+                                <CategorySection
+                                  key={cat.id}
+                                  category={cat}
+                                  displayName={`Stage ${stageNumber}`}
+                                  canMoveUp={index > 0}
+                                  canMoveDown={index < powerStages.length - 1}
+                                  onMoveUp={(id) =>
+                                    moveInOrderedSet(powerStageIds, id, "up")
+                                  }
+                                  onMoveDown={(id) =>
+                                    moveInOrderedSet(powerStageIds, id, "down")
+                                  }
+                                  onUpdateCategory={(id, name) =>
+                                    updateCategory(id, name, selectedCar.id)
+                                  }
+                                  onDeleteCategory={(id) =>
+                                    deleteCategory(id, selectedCar.id)
+                                  }
+                                  onAddMod={(
+                                    mod: Omit<Mod, "id" | "created_at">,
+                                  ) => addMod(mod, selectedCar.id)}
+                                  onUpdateMod={(id, updates) =>
+                                    updateMod(id, updates, selectedCar.id)
+                                  }
+                                  onDeleteMod={(id) =>
+                                    deleteMod(id, selectedCar.id)
+                                  }
+                                />
+                              );
+                            })}
+                          </div>
                         )}
-
-                        {powerStages.map((cat, index) => (
-                          <CategorySection
-                            key={cat.id}
-                            category={cat}
-                            canMoveUp={index > 0}
-                            canMoveDown={index < powerStages.length - 1}
-                            onMoveUp={(id) =>
-                              moveInOrderedSet(
-                                powerStages.map((category) => category.id),
-                                id,
-                                "up",
-                              )
-                            }
-                            onMoveDown={(id) =>
-                              moveInOrderedSet(
-                                powerStages.map((category) => category.id),
-                                id,
-                                "down",
-                              )
-                            }
-                            onUpdateCategory={(id, name) =>
-                              updateCategory(id, name, selectedCar.id)
-                            }
-                            onDeleteCategory={(id) =>
-                              deleteCategory(id, selectedCar.id)
-                            }
-                            onAddMod={(mod: Omit<Mod, "id" | "created_at">) =>
-                              addMod(mod, selectedCar.id)
-                            }
-                            onUpdateMod={(id, updates) =>
-                              updateMod(id, updates, selectedCar.id)
-                            }
-                            onDeleteMod={(id) => deleteMod(id, selectedCar.id)}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </section>
+                      </section>
+                    );
+                  })}
 
                   {addingCategory ? (
                     <div className="bg-[#111111] border border-[#1e1e1e] rounded-xl p-4 flex gap-2">
