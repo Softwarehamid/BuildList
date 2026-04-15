@@ -1,5 +1,12 @@
-import { useState } from "react";
-import { ExternalLink, Pencil, Trash2, X, Check } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  ExternalLink,
+  Pencil,
+  Trash2,
+  X,
+  Check,
+  StickyNote,
+} from "lucide-react";
 import type { Mod, ModStatus } from "../types/database";
 import { formatPrice } from "../lib/utils";
 
@@ -16,6 +23,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
   const [priceMax, setPriceMax] = useState(mod.price_max?.toString() ?? "");
   const [url, setUrl] = useState(mod.url ?? "");
   const [status, setStatus] = useState<ModStatus>(mod.status ?? "planned");
+  const [notes, setNotes] = useState(mod.notes ?? "");
 
   const statusOrder: ModStatus[] = ["planned", "bought", "installed"];
 
@@ -34,6 +42,12 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
     return "text-sky-300 bg-sky-900/30 border-sky-700/60";
   };
 
+  const getStatusIndicator = (value: ModStatus): string => {
+    if (value === "installed") return "INS";
+    if (value === "bought") return "BUY";
+    return "PLN";
+  };
+
   const getStatusLabel = (value: ModStatus): string => {
     if (value === "installed") return "Installed";
     if (value === "bought") return "Bought";
@@ -47,6 +61,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
       price_max: priceMax ? parseFloat(priceMax) : null,
       url: url || null,
       status,
+      notes: notes.trim() ? notes.trim() : null,
     });
     setEditing(false);
   };
@@ -57,8 +72,19 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
     setPriceMax(mod.price_max?.toString() ?? "");
     setUrl(mod.url ?? "");
     setStatus(mod.status ?? "planned");
+    setNotes(mod.notes ?? "");
     setEditing(false);
   };
+
+  useEffect(() => {
+    if (editing) return;
+    setName(mod.name);
+    setPriceMin(mod.price_min?.toString() ?? "");
+    setPriceMax(mod.price_max?.toString() ?? "");
+    setUrl(mod.url ?? "");
+    setStatus(mod.status ?? "planned");
+    setNotes(mod.notes ?? "");
+  }, [mod, editing]);
 
   const cycleStatus = () => {
     const next = getNextStatus(mod.status ?? "planned");
@@ -105,6 +131,12 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
           <option value="bought">Bought</option>
           <option value="installed">Installed</option>
         </select>
+        <textarea
+          className="w-full min-h-20 bg-[#0f0f0f] border border-[#333] text-white text-sm rounded-md px-3 py-2 focus:outline-none focus:border-red-600"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Notes (optional): waiting for sale, shop installed, supporting mod needed..."
+        />
         <div className="flex gap-2 justify-end">
           <button
             onClick={cancel}
@@ -129,19 +161,32 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
     mod.price_min !== mod.price_max;
 
   return (
-    <div className="group flex items-center justify-between gap-3 py-2.5 px-3 rounded-lg hover:bg-white/[0.03] transition-colors">
-      <div className="flex items-center gap-3 min-w-0">
+    <div className="group flex items-center justify-between gap-3 py-2.5 px-3 rounded-lg border border-transparent hover:border-[#2a2a2a] hover:bg-[#181818] hover:shadow-[0_6px_24px_rgba(0,0,0,0.22)] hover:-translate-y-[1px] transition-all">
+      <div className="flex items-start gap-3 min-w-0">
         <div className="w-1 h-1 rounded-full bg-gray-600 flex-shrink-0" />
-        <span className="text-gray-300 text-sm truncate">{mod.name}</span>
+        <div className="min-w-0">
+          <span className="text-gray-200 text-sm truncate block">
+            {mod.name}
+          </span>
+          {mod.notes && (
+            <span className="mt-0.5 text-[11px] text-gray-500 truncate flex items-center gap-1">
+              <StickyNote size={10} className="text-gray-600" />
+              {mod.notes}
+            </span>
+          )}
+        </div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         <button
           onClick={cycleStatus}
-          className={`text-[10px] uppercase tracking-wide font-semibold px-2 py-1 rounded-full border transition-all active:scale-95 ${getStatusClasses(mod.status ?? "planned")}`}
+          className={`w-12 text-[10px] uppercase tracking-wide font-semibold text-center px-1.5 py-1 rounded-full border transition-all active:scale-95 ${getStatusClasses(mod.status ?? "planned")}`}
           title="Cycle status: Planned -> Bought -> Installed"
         >
-          {getStatusLabel(mod.status ?? "planned")}
+          {getStatusIndicator(mod.status ?? "planned")}
         </button>
+        <span className="text-[10px] text-gray-500 w-14 text-left hidden sm:inline">
+          {getStatusLabel(mod.status ?? "planned")}
+        </span>
         <span
           className={`text-sm font-medium tabular-nums ${mod.price_min === null && mod.price_max === null ? "text-gray-500 italic" : isRange ? "text-amber-400" : "text-green-400"}`}
         >

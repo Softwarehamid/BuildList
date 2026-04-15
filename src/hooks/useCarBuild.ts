@@ -699,9 +699,24 @@ export function useCarBuild() {
       const client = getClient();
       if (!client) return;
 
+      setSelectedCar((prev) => {
+        if (!prev || prev.id !== carId) return prev;
+
+        return {
+          ...prev,
+          categories: prev.categories.map((category) => ({
+            ...category,
+            mods: category.mods.map((mod) =>
+              mod.id === id ? { ...mod, ...updates } : mod,
+            ),
+          })),
+        };
+      });
+
       const { error } = await client.from("mods").update(updates).eq("id", id);
       if (error) {
         setError(error.message);
+        await fetchCarDetails(carId);
         return;
       }
       await fetchCarDetails(carId);
