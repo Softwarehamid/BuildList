@@ -44,17 +44,17 @@ export function useCarBuild() {
   }, [getClient]);
 
   function getPowerStageNumber(name: string): number | null {
-    const stageMatch = name.match(/^stage\s*(\d+)$/i);
+    const stageMatch = name.match(/^stage\b\D*(\d+)/i);
     if (stageMatch) return Number.parseInt(stageMatch[1], 10);
 
-    const legacyMatch = name.match(/^power\s*-\s*stage\s*(\d+)$/i);
+    const legacyMatch = name.match(/^power\s*-\s*stage\b\D*(\d+)/i);
     if (legacyMatch) return Number.parseInt(legacyMatch[1], 10);
 
     return null;
   }
 
   function isPowerStageCategory(name: string): boolean {
-    return getPowerStageNumber(name) !== null;
+    return /^stage\b/i.test(name) || /^power\s*-\s*stage\b/i.test(name);
   }
 
   const fetchCarDetails = useCallback(
@@ -228,11 +228,18 @@ export function useCarBuild() {
       if (!client || !selectedCar || selectedCar.id !== carId) return;
 
       const stageNumbers = selectedCar.categories
+        .filter((category) => isPowerStageCategory(category.name))
         .map((category) => getPowerStageNumber(category.name) ?? 0)
         .filter((num) => num > 0);
 
+      const existingStageCount = selectedCar.categories.filter((category) =>
+        isPowerStageCategory(category.name),
+      ).length;
+
+      const maxExistingStageNumber =
+        stageNumbers.length > 0 ? Math.max(...stageNumbers) : 0;
       const nextStage =
-        stageNumbers.length > 0 ? Math.max(...stageNumbers) + 1 : 1;
+        Math.max(maxExistingStageNumber, existingStageCount) + 1;
       const maxOrder =
         selectedCar.categories.reduce(
           (m, c) => Math.max(m, c.display_order),

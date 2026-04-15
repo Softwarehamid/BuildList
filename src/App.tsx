@@ -15,14 +15,14 @@ import { CategorySection } from "./components/CategorySection";
 import type { Mod } from "./types/database";
 
 function isPowerStageCategory(name: string): boolean {
-  return /^stage\s*\d+$/i.test(name) || /^power\s*-\s*stage\s*\d+$/i.test(name);
+  return /^stage\b/i.test(name) || /^power\s*-\s*stage\b/i.test(name);
 }
 
 function getPowerStageNumber(name: string): number | null {
-  const stageMatch = name.match(/^stage\s*(\d+)$/i);
+  const stageMatch = name.match(/^stage\b\D*(\d+)/i);
   if (stageMatch) return Number.parseInt(stageMatch[1], 10);
 
-  const legacyMatch = name.match(/^power\s*-\s*stage\s*(\d+)$/i);
+  const legacyMatch = name.match(/^power\s*-\s*stage\b\D*(\d+)/i);
   if (legacyMatch) return Number.parseInt(legacyMatch[1], 10);
 
   return null;
