@@ -31,6 +31,32 @@ interface ParsedImportBuild {
   categories: ParsedImportCategory[];
 }
 
+function parseStatusFromNotes(notes: string | null): ModStatus | null {
+  if (!notes) return null;
+  const normalized = notes.trim().toLowerCase();
+  if (normalized === "status: installed") return "installed";
+  if (normalized === "status: bought") return "bought";
+  if (normalized === "status: planned") return "planned";
+  return null;
+}
+
+function normalizeModStatus(
+  status: string | null | undefined,
+  notes: string | null,
+): ModStatus {
+  const notesStatus = parseStatusFromNotes(notes);
+
+  if (status === "planned" && notesStatus && notesStatus !== "planned") {
+    return notesStatus;
+  }
+
+  if (status === "planned" || status === "bought" || status === "installed") {
+    return status;
+  }
+
+  return notesStatus ?? "planned";
+}
+
 function extractDollarValues(text: string): number[] {
   return Array.from(text.matchAll(/\$\s*([\d,]+(?:\.\d{1,2})?)/g))
     .map((match) => Number.parseFloat(match[1].replaceAll(",", "")))
@@ -223,7 +249,15 @@ export function useCarBuild() {
       const categoriesWithMods: CategoryWithMods[] = (categories || []).map(
         (cat) => ({
           ...cat,
-          mods: (modsData || []).filter((m) => m.category_id === cat.id),
+          mods: (modsData || [])
+            .filter((m) => m.category_id === cat.id)
+            .map((m) => ({
+              ...m,
+              status: normalizeModStatus(
+                (m as { status?: string | null }).status,
+                m.notes,
+              ),
+            })),
         }),
       );
 
@@ -707,7 +741,16 @@ export function useCarBuild() {
           categories: prev.categories.map((category) => ({
             ...category,
             mods: category.mods.map((mod) =>
-              mod.id === id ? { ...mod, ...updates } : mod,
+              mod.id === id
+                ? {
+                    ...mod,
+                    ...updates,
+                    status: normalizeModStatus(
+                      (updates.status as string | undefined) ?? mod.status,
+                      updates.notes === undefined ? mod.notes : updates.notes,
+                    ),
+                  }
+                : mod,
             ),
           })),
         };

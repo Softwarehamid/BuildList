@@ -1,12 +1,5 @@
 import { useEffect, useState } from "react";
-import {
-  ExternalLink,
-  Pencil,
-  Trash2,
-  X,
-  Check,
-  StickyNote,
-} from "lucide-react";
+import { ExternalLink, Pencil, Trash2, X, Check } from "lucide-react";
 import type { Mod, ModStatus } from "../types/database";
 import { formatPrice } from "../lib/utils";
 
@@ -48,20 +41,18 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
     return "PLN";
   };
 
-  const getStatusLabel = (value: ModStatus): string => {
-    if (value === "installed") return "Installed";
-    if (value === "bought") return "Bought";
-    return "Planned";
-  };
-
   const save = () => {
+    const cleanedNotes = notes
+      .replace(/^status:\s*(planned|bought|installed)\s*$/i, "")
+      .trim();
+
     onUpdate(mod.id, {
       name,
       price_min: priceMin ? parseFloat(priceMin) : null,
       price_max: priceMax ? parseFloat(priceMax) : null,
       url: url || null,
       status,
-      notes: notes.trim() ? notes.trim() : null,
+      notes: cleanedNotes ? cleanedNotes : null,
     });
     setEditing(false);
   };
@@ -164,17 +155,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
     <div className="group flex items-center justify-between gap-3 py-2.5 px-3 rounded-lg border border-transparent hover:border-[#2a2a2a] hover:bg-[#181818] hover:shadow-[0_6px_24px_rgba(0,0,0,0.22)] hover:-translate-y-[1px] transition-all">
       <div className="flex items-start gap-3 min-w-0">
         <div className="w-1 h-1 rounded-full bg-gray-600 flex-shrink-0" />
-        <div className="min-w-0">
-          <span className="text-gray-200 text-sm truncate block">
-            {mod.name}
-          </span>
-          {mod.notes && (
-            <span className="mt-0.5 text-[11px] text-gray-500 truncate flex items-center gap-1">
-              <StickyNote size={10} className="text-gray-600" />
-              {mod.notes}
-            </span>
-          )}
-        </div>
+        <span className="text-gray-200 text-sm truncate block">{mod.name}</span>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         <button
@@ -184,9 +165,6 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
         >
           {getStatusIndicator(mod.status ?? "planned")}
         </button>
-        <span className="text-[10px] text-gray-500 w-14 text-left hidden sm:inline">
-          {getStatusLabel(mod.status ?? "planned")}
-        </span>
         <span
           className={`text-sm font-medium tabular-nums ${mod.price_min === null && mod.price_max === null ? "text-gray-500 italic" : isRange ? "text-amber-400" : "text-green-400"}`}
         >
