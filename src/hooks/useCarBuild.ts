@@ -149,7 +149,7 @@ function parseBuildImport(rawText: string): ParsedImportBuild {
 
       const isHeading =
         line.endsWith(":") ||
-        (/^[A-Za-z][A-Za-z0-9 &+\/'()_-]{1,35}$/i.test(line) &&
+        (/^[A-Za-z][A-Za-z0-9 &+/'()_-]{1,35}$/i.test(line) &&
           !line.includes("$") &&
           !line.includes("=") &&
           !/^vin\b/i.test(line));
