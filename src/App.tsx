@@ -7,6 +7,7 @@ import {
   Zap,
   ArrowUp,
   ArrowDown,
+  FileText,
 } from "lucide-react";
 import { useCarBuild } from "./hooks/useCarBuild";
 import { Sidebar } from "./components/Sidebar";
@@ -28,6 +29,12 @@ function getPowerStageNumber(name: string): number | null {
   return null;
 }
 
+function isNumericStageTitle(name: string): boolean {
+  return (
+    /^stage\s*\d+\s*$/i.test(name) || /^power\s*-\s*stage\s*\d+\s*$/i.test(name)
+  );
+}
+
 export default function App() {
   const {
     cars,
@@ -40,6 +47,7 @@ export default function App() {
     deleteCar,
     addCategory,
     addPowerStage,
+    importBuildFromText,
     movePowerGroup,
     updateCategory,
     deleteCategory,
@@ -52,6 +60,9 @@ export default function App() {
   const [addingCategory, setAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [powerOpen, setPowerOpen] = useState(true);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importing, setImporting] = useState(false);
 
   const handleAddCar = async (car: {
     name: string;
@@ -68,6 +79,14 @@ export default function App() {
     await addCategory(selectedCar.id, newCategoryName.trim());
     setNewCategoryName("");
     setAddingCategory(false);
+  };
+
+  const handleImportBuild = async () => {
+    if (!importText.trim()) return;
+
+    setImporting(true);
+    await importBuildFromText(importText);
+    setImporting(false);
   };
 
   const orderedCategories = selectedCar
@@ -290,11 +309,14 @@ export default function App() {
                             {powerStages.map((cat, index) => {
                               const stageNumber =
                                 getPowerStageNumber(cat.name) ?? index + 1;
+                              const displayName = isNumericStageTitle(cat.name)
+                                ? `Stage ${stageNumber}`
+                                : cat.name;
                               return (
                                 <CategorySection
                                   key={cat.id}
                                   category={cat}
-                                  displayName={`Stage ${stageNumber}`}
+                                  displayName={displayName}
                                   canMoveUp={index > 0}
                                   canMoveDown={index < powerStages.length - 1}
                                   onMoveUp={(id) =>
@@ -361,6 +383,55 @@ export default function App() {
                       <Plus size={14} /> Add Category
                     </button>
                   )}
+
+                  <section className="bg-[#111111] border border-[#1e1e1e] rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setImportOpen((open) => !open)}
+                      className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-white/[0.02] transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <FileText size={14} className="text-gray-400" />
+                        <span className="text-sm font-semibold text-gray-200">
+                          Import From Notes
+                        </span>
+                      </div>
+                      {importOpen ? (
+                        <ChevronDown size={15} className="text-gray-500" />
+                      ) : (
+                        <ChevronRight size={15} className="text-gray-500" />
+                      )}
+                    </button>
+
+                    {importOpen && (
+                      <div className="border-t border-[#1a1a1a] p-4 space-y-3">
+                        <p className="text-xs text-gray-500">
+                          Paste checklist text (with headings and - [ ] / - [x]
+                          lines). A new car build will be created.
+                        </p>
+                        <textarea
+                          className="w-full min-h-48 bg-[#0f0f0f] border border-[#333] text-white text-sm rounded-md px-3 py-2 focus:outline-none focus:border-red-600 placeholder-gray-600"
+                          value={importText}
+                          onChange={(e) => setImportText(e.target.value)}
+                          placeholder="Paste your Apple Notes build list here..."
+                        />
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            onClick={() => setImportOpen(false)}
+                            className="px-3 py-2 text-sm text-gray-500 hover:text-white border border-[#333] rounded-md transition-colors"
+                          >
+                            Close
+                          </button>
+                          <button
+                            onClick={handleImportBuild}
+                            disabled={importing || !importText.trim()}
+                            className="px-4 py-2 text-sm text-white bg-blue-700 hover:bg-blue-600 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {importing ? "Importing..." : "Import Build"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </section>
                 </div>
               </>
             ) : (

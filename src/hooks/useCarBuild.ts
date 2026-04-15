@@ -11,6 +11,127 @@ import type {
   Mod,
 } from "../types/database";
 
+interface ParsedImportMod {
+  name: string;
+  price_min: number | null;
+  price_max: number | null;
+  url: string | null;
+  notes: string | null;
+}
+
+interface ParsedImportCategory {
+  name: string;
+  mods: ParsedImportMod[];
+}
+
+interface ParsedImportBuild {
+  carName: string;
+  categories: ParsedImportCategory[];
+}
+
+function extractDollarValues(text: string): number[] {
+  return Array.from(text.matchAll(/\$\s*([\d,]+(?:\.\d{1,2})?)/g))
+    .map((match) => Number.parseFloat(match[1].replaceAll(",", "")))
+    .filter((value) => Number.isFinite(value));
+}
+
+function extractFirstUrl(text: string): string | null {
+  const match = text.match(/https?:\/\/\S+/i);
+  return match ? match[0].replace(/[),.;]+$/, "") : null;
+}
+
+function parseBuildImport(rawText: string): ParsedImportBuild {
+  const lines = rawText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  let carName = "Imported Build";
+  let currentCategory = "General";
+
+  const categories: ParsedImportCategory[] = [];
+  const categoryMap = new Map<string, ParsedImportCategory>();
+
+  const ensureCategory = (name: string): ParsedImportCategory => {
+    const normalizedName = name.trim() || "General";
+    const existing = categoryMap.get(normalizedName);
+    if (existing) return existing;
+
+    const created = { name: normalizedName, mods: [] };
+    categoryMap.set(normalizedName, created);
+    categories.push(created);
+    return created;
+  };
+
+  for (const line of lines) {
+    const checklist = line.match(/^-\s*\[(x| )\]\s*(.+)$/i);
+
+    if (!checklist) {
+      const isPotentialCarName =
+        carName === "Imported Build" &&
+        !line.includes("$") &&
+        !line.includes("=") &&
+        !line.endsWith(":") &&
+        !line.startsWith("-") &&
+        line.length <= 60;
+
+      if (isPotentialCarName) {
+        carName = line;
+        continue;
+      }
+
+      const isHeading =
+        line.endsWith(":") ||
+        (/^[A-Za-z][A-Za-z0-9 &+\/'()_-]{1,35}$/i.test(line) &&
+          !line.includes("$") &&
+          !line.includes("=") &&
+          !/^vin\b/i.test(line));
+
+      if (isHeading) {
+        currentCategory = line.replace(/:\s*$/, "").trim();
+        ensureCategory(currentCategory);
+      }
+
+      continue;
+    }
+
+    const checked = checklist[1].toLowerCase() === "x";
+    const rawItem = checklist[2].trim();
+    const category = ensureCategory(currentCategory);
+
+    const url = extractFirstUrl(rawItem);
+    const withoutUrl = rawItem.replace(/https?:\/\/\S+/gi, "").trim();
+    const dollarValues = extractDollarValues(withoutUrl);
+    const totalPrice =
+      dollarValues.length > 0
+        ? dollarValues.reduce((sum, value) => sum + value, 0)
+        : null;
+
+    let name = withoutUrl
+      .replace(/\$\s*[\d,]+(?:\.\d{1,2})?/g, "")
+      .replace(/[–-]\s*$/g, "")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+
+    if (!name) {
+      name = withoutUrl;
+    }
+
+    category.mods.push({
+      name,
+      price_min: totalPrice,
+      price_max: totalPrice,
+      url,
+      notes: checked ? "Status: Installed" : "Status: Planned",
+    });
+  }
+
+  return {
+    carName,
+    categories: categories.filter((category) => category.mods.length > 0),
+  };
+}
+
 export function useCarBuild() {
   const [cars, setCars] = useState<Car[]>([]);
   const [selectedCar, setSelectedCar] = useState<CarWithCategories | null>(
@@ -260,6 +381,86 @@ export function useCarBuild() {
       await fetchCarDetails(carId);
     },
     [fetchCarDetails, getClient, selectedCar],
+  );
+
+  const importBuildFromText = useCallback(
+    async (rawText: string) => {
+      const client = getClient();
+      if (!client) return null;
+
+      const parsed = parseBuildImport(rawText);
+      if (!parsed.carName.trim()) {
+        setError("Could not detect a build name from imported text.");
+        return null;
+      }
+
+      if (parsed.categories.length === 0) {
+        setError("Could not detect any checklist parts to import.");
+        return null;
+      }
+
+      const { data: newCar, error: carError } = await client
+        .from("cars")
+        .insert({
+          name: parsed.carName,
+          base_price: null,
+          out_the_door_price: null,
+          down_payment: null,
+          image_url: null,
+        })
+        .select()
+        .maybeSingle();
+
+      if (carError || !newCar) {
+        setError(carError?.message ?? "Failed to create imported car build.");
+        return null;
+      }
+
+      for (let index = 0; index < parsed.categories.length; index += 1) {
+        const category = parsed.categories[index];
+
+        const { data: insertedCategory, error: categoryError } = await client
+          .from("mod_categories")
+          .insert({
+            car_id: newCar.id,
+            name: category.name,
+            display_order: index + 1,
+          })
+          .select()
+          .maybeSingle();
+
+        if (categoryError || !insertedCategory) {
+          setError(
+            categoryError?.message ??
+              `Failed to import category: ${category.name}`,
+          );
+          return null;
+        }
+
+        if (category.mods.length > 0) {
+          const { error: modsError } = await client.from("mods").insert(
+            category.mods.map((mod) => ({
+              category_id: insertedCategory.id,
+              name: mod.name,
+              price_min: mod.price_min,
+              price_max: mod.price_max,
+              url: mod.url,
+              notes: mod.notes,
+            })),
+          );
+
+          if (modsError) {
+            setError(modsError.message);
+            return null;
+          }
+        }
+      }
+
+      await fetchCars();
+      await fetchCarDetails(newCar.id);
+      return newCar.id;
+    },
+    [fetchCarDetails, fetchCars, getClient],
   );
 
   const movePowerGroup = useCallback(
@@ -530,6 +731,7 @@ export function useCarBuild() {
     deleteCar,
     addCategory,
     addPowerStage,
+    importBuildFromText,
     movePowerGroup,
     updateCategory,
     deleteCategory,
