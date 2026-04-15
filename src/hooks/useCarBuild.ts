@@ -45,12 +45,28 @@ function parseStatusFromNotes(notes: string | null): ModStatus | null {
   return null;
 }
 
+function normalizeStatusValue(
+  status: string | null | undefined,
+): ModStatus | null {
+  const normalized = status?.trim().toLowerCase();
+  if (
+    normalized === "planned" ||
+    normalized === "bought" ||
+    normalized === "installed"
+  ) {
+    return normalized;
+  }
+
+  return null;
+}
+
 function normalizeModStatus(
   status: string | null | undefined,
   notes: string | null,
 ): ModStatus {
-  if (status === "planned" || status === "bought" || status === "installed") {
-    return status;
+  const normalized = normalizeStatusValue(status);
+  if (normalized) {
+    return normalized;
   }
 
   return parseStatusFromNotes(notes) ?? "planned";
@@ -732,6 +748,14 @@ export function useCarBuild() {
       const client = getClient();
       if (!client) return;
 
+      const normalizedUpdates = {
+        ...updates,
+        status:
+          updates.status !== undefined
+            ? (normalizeStatusValue(updates.status) ?? updates.status)
+            : updates.status,
+      };
+
       setSelectedCar((prev) => {
         if (!prev || prev.id !== carId) return prev;
 
@@ -743,10 +767,13 @@ export function useCarBuild() {
               mod.id === id
                 ? {
                     ...mod,
-                    ...updates,
+                    ...normalizedUpdates,
                     status: normalizeModStatus(
-                      (updates.status as string | undefined) ?? mod.status,
-                      updates.notes === undefined ? mod.notes : updates.notes,
+                      (normalizedUpdates.status as string | undefined) ??
+                        mod.status,
+                      normalizedUpdates.notes === undefined
+                        ? mod.notes
+                        : normalizedUpdates.notes,
                     ),
                   }
                 : mod,
@@ -755,7 +782,10 @@ export function useCarBuild() {
         };
       });
 
-      const { error } = await client.from("mods").update(updates).eq("id", id);
+      const { error } = await client
+        .from("mods")
+        .update(normalizedUpdates)
+        .eq("id", id);
       if (error) {
         setError(error.message);
         await fetchCarDetails(carId);
