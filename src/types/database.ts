@@ -3,18 +3,18 @@ export interface Database {
     Tables: {
       cars: {
         Row: Car;
-        Insert: Omit<Car, 'id' | 'created_at'>;
-        Update: Partial<Omit<Car, 'id' | 'created_at'>>;
+        Insert: Omit<Car, "id" | "created_at">;
+        Update: Partial<Omit<Car, "id" | "created_at">>;
       };
       mod_categories: {
         Row: ModCategory;
-        Insert: Omit<ModCategory, 'id' | 'created_at'>;
-        Update: Partial<Omit<ModCategory, 'id' | 'created_at'>>;
+        Insert: Omit<ModCategory, "id" | "created_at">;
+        Update: Partial<Omit<ModCategory, "id" | "created_at">>;
       };
       mods: {
         Row: Mod;
-        Insert: Omit<Mod, 'id' | 'created_at'>;
-        Update: Partial<Omit<Mod, 'id' | 'created_at'>>;
+        Insert: Omit<Mod, "id" | "created_at">;
+        Update: Partial<Omit<Mod, "id" | "created_at">>;
       };
     };
   };
@@ -45,9 +45,12 @@ export interface Mod {
   price_min: number | null;
   price_max: number | null;
   url: string | null;
+  status: ModStatus;
   notes: string | null;
   created_at: string;
 }
+
+export type ModStatus = "planned" | "bought" | "installed";
 
 export interface CategoryWithMods extends ModCategory {
   mods: Mod[];

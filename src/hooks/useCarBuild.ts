@@ -9,6 +9,7 @@ import type {
   CarWithCategories,
   CategoryWithMods,
   Mod,
+  ModStatus,
 } from "../types/database";
 
 interface ParsedImportMod {
@@ -16,6 +17,7 @@ interface ParsedImportMod {
   price_min: number | null;
   price_max: number | null;
   url: string | null;
+  status: ModStatus;
   notes: string | null;
 }
 
@@ -122,7 +124,8 @@ function parseBuildImport(rawText: string): ParsedImportBuild {
       price_min: totalPrice,
       price_max: totalPrice,
       url,
-      notes: checked ? "Status: Installed" : "Status: Planned",
+      status: checked ? "installed" : "planned",
+      notes: null,
     });
   }
 
@@ -445,6 +448,7 @@ export function useCarBuild() {
               price_min: mod.price_min,
               price_max: mod.price_max,
               url: mod.url,
+              status: mod.status,
               notes: mod.notes,
             })),
           );

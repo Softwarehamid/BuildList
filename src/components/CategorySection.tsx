@@ -102,6 +102,7 @@ export function CategorySection({
       price_min: form.priceMin ? parseFloat(form.priceMin) : null,
       price_max: form.priceMax ? parseFloat(form.priceMax) : null,
       url: form.url || null,
+      status: "planned",
       notes: null,
     });
     setForm({ name: "", priceMin: "", priceMax: "", url: "" });
