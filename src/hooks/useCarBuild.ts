@@ -33,7 +33,9 @@ interface ParsedImportBuild {
 
 function parseStatusFromNotes(notes: string | null): ModStatus | null {
   if (!notes) return null;
-  const match = notes.match(/^\s*status:\s*(planned|bought|installed)\b/im);
+  const match = notes.match(
+    /(?:^|\n)\s*status:\s*(planned|bought|installed)\b/im,
+  );
   if (!match) return null;
 
   const normalized = match[1].toLowerCase();
@@ -47,17 +49,11 @@ function normalizeModStatus(
   status: string | null | undefined,
   notes: string | null,
 ): ModStatus {
-  const notesStatus = parseStatusFromNotes(notes);
-
-  if (status === "planned" && notesStatus && notesStatus !== "planned") {
-    return notesStatus;
-  }
-
   if (status === "planned" || status === "bought" || status === "installed") {
     return status;
   }
 
-  return notesStatus ?? "planned";
+  return parseStatusFromNotes(notes) ?? "planned";
 }
 
 function extractDollarValues(text: string): number[] {

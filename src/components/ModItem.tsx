@@ -13,15 +13,9 @@ function stripStatusMarker(notes: string | null): string {
   if (!notes) return "";
 
   return notes
-    .replace(/^\s*status:\s*(planned|bought|installed)\s*\n?/i, "")
+    .replace(/(^|\n)\s*status:\s*(planned|bought|installed)\b\s*\n?/gi, "$1")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
-}
-
-function buildNotesWithStatus(status: ModStatus, userNotes: string): string {
-  const title = status.charAt(0).toUpperCase() + status.slice(1);
-  const trimmed = userNotes.trim();
-  if (!trimmed) return `Status: ${title}`;
-  return `Status: ${title}\n${trimmed}`;
 }
 
 export function ModItem({ mod, onUpdate, onDelete }: Props) {
@@ -57,7 +51,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
   };
 
   const save = () => {
-    const withStatusMarker = buildNotesWithStatus(status, notes);
+    const cleanedNotes = stripStatusMarker(notes);
 
     onUpdate(mod.id, {
       name,
@@ -65,7 +59,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
       price_max: priceMax ? parseFloat(priceMax) : null,
       url: url || null,
       status,
-      notes: withStatusMarker,
+      notes: cleanedNotes ? cleanedNotes : null,
     });
     setEditing(false);
   };
@@ -92,10 +86,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
 
   const cycleStatus = () => {
     const next = getNextStatus(mod.status ?? "planned");
-    onUpdate(mod.id, {
-      status: next,
-      notes: buildNotesWithStatus(next, stripStatusMarker(mod.notes)),
-    });
+    onUpdate(mod.id, { status: next });
   };
 
   if (editing) {
