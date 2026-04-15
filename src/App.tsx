@@ -101,6 +101,10 @@ export default function App() {
     orderedBlocks.push({ type: "regular", categoryId: category.id });
   }
 
+  if (!insertedPowerBlock) {
+    orderedBlocks.push({ type: "power" });
+  }
+
   const regularById = new Map(
     regularCategories.map((category) => [category.id, category]),
   );
@@ -110,9 +114,12 @@ export default function App() {
   const powerBlockIndex = orderedBlocks.findIndex(
     (block) => block.type === "power",
   );
-  const canMovePowerUp = powerBlockIndex > 0;
+  const hasPowerStages = powerStages.length > 0;
+  const canMovePowerUp = hasPowerStages && powerBlockIndex > 0;
   const canMovePowerDown =
-    powerBlockIndex !== -1 && powerBlockIndex < orderedBlocks.length - 1;
+    hasPowerStages &&
+    powerBlockIndex !== -1 &&
+    powerBlockIndex < orderedBlocks.length - 1;
 
   const moveInOrderedSet = (
     orderedIds: string[],
