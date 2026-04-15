@@ -9,6 +9,21 @@ interface Props {
   onDelete: (id: string) => void;
 }
 
+function stripStatusMarker(notes: string | null): string {
+  if (!notes) return "";
+
+  return notes
+    .replace(/^\s*status:\s*(planned|bought|installed)\s*\n?/i, "")
+    .trim();
+}
+
+function buildNotesWithStatus(status: ModStatus, userNotes: string): string {
+  const title = status.charAt(0).toUpperCase() + status.slice(1);
+  const trimmed = userNotes.trim();
+  if (!trimmed) return `Status: ${title}`;
+  return `Status: ${title}\n${trimmed}`;
+}
+
 export function ModItem({ mod, onUpdate, onDelete }: Props) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(mod.name);
@@ -16,7 +31,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
   const [priceMax, setPriceMax] = useState(mod.price_max?.toString() ?? "");
   const [url, setUrl] = useState(mod.url ?? "");
   const [status, setStatus] = useState<ModStatus>(mod.status ?? "planned");
-  const [notes, setNotes] = useState(mod.notes ?? "");
+  const [notes, setNotes] = useState(stripStatusMarker(mod.notes));
 
   const statusOrder: ModStatus[] = ["planned", "bought", "installed"];
 
@@ -42,9 +57,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
   };
 
   const save = () => {
-    const cleanedNotes = notes
-      .replace(/^status:\s*(planned|bought|installed)\s*$/i, "")
-      .trim();
+    const withStatusMarker = buildNotesWithStatus(status, notes);
 
     onUpdate(mod.id, {
       name,
@@ -52,7 +65,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
       price_max: priceMax ? parseFloat(priceMax) : null,
       url: url || null,
       status,
-      notes: cleanedNotes ? cleanedNotes : null,
+      notes: withStatusMarker,
     });
     setEditing(false);
   };
@@ -63,7 +76,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
     setPriceMax(mod.price_max?.toString() ?? "");
     setUrl(mod.url ?? "");
     setStatus(mod.status ?? "planned");
-    setNotes(mod.notes ?? "");
+    setNotes(stripStatusMarker(mod.notes));
     setEditing(false);
   };
 
@@ -74,12 +87,15 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
     setPriceMax(mod.price_max?.toString() ?? "");
     setUrl(mod.url ?? "");
     setStatus(mod.status ?? "planned");
-    setNotes(mod.notes ?? "");
+    setNotes(stripStatusMarker(mod.notes));
   }, [mod, editing]);
 
   const cycleStatus = () => {
     const next = getNextStatus(mod.status ?? "planned");
-    onUpdate(mod.id, { status: next });
+    onUpdate(mod.id, {
+      status: next,
+      notes: buildNotesWithStatus(next, stripStatusMarker(mod.notes)),
+    });
   };
 
   if (editing) {

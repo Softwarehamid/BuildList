@@ -33,10 +33,13 @@ interface ParsedImportBuild {
 
 function parseStatusFromNotes(notes: string | null): ModStatus | null {
   if (!notes) return null;
-  const normalized = notes.trim().toLowerCase();
-  if (normalized === "status: installed") return "installed";
-  if (normalized === "status: bought") return "bought";
-  if (normalized === "status: planned") return "planned";
+  const match = notes.match(/^\s*status:\s*(planned|bought|installed)\b/im);
+  if (!match) return null;
+
+  const normalized = match[1].toLowerCase();
+  if (normalized === "installed") return "installed";
+  if (normalized === "bought") return "bought";
+  if (normalized === "planned") return "planned";
   return null;
 }
 
