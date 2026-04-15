@@ -208,6 +208,42 @@ export function useCarBuild() {
     [selectedCar, fetchCarDetails, getClient],
   );
 
+  const addPowerStage = useCallback(
+    async (carId: string) => {
+      const client = getClient();
+      if (!client || !selectedCar || selectedCar.id !== carId) return;
+
+      const stageNumbers = selectedCar.categories
+        .map((category) => {
+          const match = category.name.match(/^power\s*-\s*stage\s*(\d+)$/i);
+          return match ? Number.parseInt(match[1], 10) : 0;
+        })
+        .filter((num) => num > 0);
+
+      const nextStage =
+        stageNumbers.length > 0 ? Math.max(...stageNumbers) + 1 : 1;
+      const maxOrder =
+        selectedCar.categories.reduce(
+          (m, c) => Math.max(m, c.display_order),
+          0,
+        ) ?? 0;
+
+      const { error } = await client.from("mod_categories").insert({
+        car_id: carId,
+        name: `Power - Stage ${nextStage}`,
+        display_order: maxOrder + 1,
+      });
+
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      await fetchCarDetails(carId);
+    },
+    [fetchCarDetails, getClient, selectedCar],
+  );
+
   const updateCategory = useCallback(
     async (id: string, name: string, carId: string) => {
       const client = getClient();
@@ -287,6 +323,56 @@ export function useCarBuild() {
     [fetchCarDetails, getClient, selectedCar],
   );
 
+  const moveCategoryInList = useCallback(
+    async (
+      carId: string,
+      orderedCategoryIds: string[],
+      categoryId: string,
+      direction: "up" | "down",
+    ) => {
+      const client = getClient();
+      if (!client || !selectedCar || selectedCar.id !== carId) return;
+
+      const currentIndex = orderedCategoryIds.findIndex(
+        (id) => id === categoryId,
+      );
+      if (currentIndex === -1) return;
+
+      const targetIndex =
+        direction === "up" ? currentIndex - 1 : currentIndex + 1;
+      if (targetIndex < 0 || targetIndex >= orderedCategoryIds.length) return;
+
+      const currentCategory = selectedCar.categories.find(
+        (c) => c.id === categoryId,
+      );
+      const targetCategory = selectedCar.categories.find(
+        (c) => c.id === orderedCategoryIds[targetIndex],
+      );
+
+      if (!currentCategory || !targetCategory) return;
+
+      const updates = [
+        { id: currentCategory.id, display_order: targetCategory.display_order },
+        { id: targetCategory.id, display_order: currentCategory.display_order },
+      ];
+
+      for (const update of updates) {
+        const { error } = await client
+          .from("mod_categories")
+          .update({ display_order: update.display_order })
+          .eq("id", update.id);
+
+        if (error) {
+          setError(error.message);
+          return;
+        }
+      }
+
+      await fetchCarDetails(carId);
+    },
+    [fetchCarDetails, getClient, selectedCar],
+  );
+
   const addMod = useCallback(
     async (mod: Omit<Mod, "id" | "created_at">, carId: string) => {
       const client = getClient();
@@ -342,9 +428,11 @@ export function useCarBuild() {
     updateCar,
     deleteCar,
     addCategory,
+    addPowerStage,
     updateCategory,
     deleteCategory,
     moveCategory,
+    moveCategoryInList,
     addMod,
     updateMod,
     deleteMod,
