@@ -72,6 +72,30 @@ function normalizeModStatus(
   return parseStatusFromNotes(notes) ?? "planned";
 }
 
+function isStatusColumnMissingError(message: string): boolean {
+  return /status.*column|column.*status|schema cache/i.test(message);
+}
+
+function makeStatusNote(status: ModStatus): string {
+  const title = status.charAt(0).toUpperCase() + status.slice(1);
+  return `Status: ${title}`;
+}
+
+function appendStatusNote(notes: string | null, status: ModStatus): string {
+  const existingNotes = notes?.trim();
+  const statusNote = makeStatusNote(status);
+
+  if (!existingNotes) return statusNote;
+  if (/^status:\s*(planned|bought|installed)\b/im.test(existingNotes)) {
+    return existingNotes.replace(
+      /(^|\n)\s*status:\s*(planned|bought|installed)\b.*?(?=\n|$)/gi,
+      `$1${statusNote}`,
+    );
+  }
+
+  return `${statusNote}\n${existingNotes}`;
+}
+
 function extractDollarValues(text: string): number[] {
   return Array.from(text.matchAll(/\$\s*([\d,]+(?:\.\d{1,2})?)/g))
     .map((match) => Number.parseFloat(match[1].replaceAll(",", "")))
@@ -733,7 +757,30 @@ export function useCarBuild() {
       const client = getClient();
       if (!client) return;
 
-      const { error } = await client.from("mods").insert(mod);
+      const normalizedMod = {
+        ...mod,
+        status: normalizeModStatus(mod.status, mod.notes ?? null),
+      };
+
+      let { error } = await client.from("mods").insert(normalizedMod);
+      if (error && isStatusColumnMissingError(error.message)) {
+        const fallbackMod = {
+          ...normalizedMod,
+          notes: appendStatusNote(normalizedMod.notes, normalizedMod.status),
+        };
+
+        const fallbackInsert = await client.from("mods").insert({
+          category_id: fallbackMod.category_id,
+          name: fallbackMod.name,
+          price_min: fallbackMod.price_min,
+          price_max: fallbackMod.price_max,
+          url: fallbackMod.url,
+          notes: fallbackMod.notes,
+        });
+
+        error = fallbackInsert.error;
+      }
+
       if (error) {
         setError(error.message);
         return;
@@ -752,7 +799,7 @@ export function useCarBuild() {
         ...updates,
         status:
           updates.status !== undefined
-            ? (normalizeStatusValue(updates.status) ?? updates.status)
+            ? normalizeModStatus(updates.status, updates.notes ?? null)
             : updates.status,
       };
 
@@ -782,10 +829,28 @@ export function useCarBuild() {
         };
       });
 
-      const { error } = await client
+      let { error } = await client
         .from("mods")
         .update(normalizedUpdates)
         .eq("id", id);
+
+      if (error && isStatusColumnMissingError(error.message)) {
+        const fallbackUpdates = { ...normalizedUpdates };
+        if (fallbackUpdates.status !== undefined) {
+          fallbackUpdates.notes = appendStatusNote(
+            fallbackUpdates.notes ?? null,
+            fallbackUpdates.status,
+          );
+          delete fallbackUpdates.status;
+        }
+
+        const fallbackUpdate = await client
+          .from("mods")
+          .update(fallbackUpdates)
+          .eq("id", id);
+        error = fallbackUpdate.error;
+      }
+
       if (error) {
         setError(error.message);
         await fetchCarDetails(carId);
