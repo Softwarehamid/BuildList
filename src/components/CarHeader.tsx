@@ -126,12 +126,12 @@ export function CarHeader({ car, onUpdate }: Props) {
   };
 
   const totalParts = allMods.length;
-  const boughtCount = allMods.filter((mod) => mod.status === "bought").length;
+  const onHandCount = allMods.filter((mod) => mod.status === "onHand").length;
   const installedCount = allMods.filter(
     (mod) => mod.status === "installed",
   ).length;
   const spentValue = allMods
-    .filter((mod) => mod.status === "bought" || mod.status === "installed")
+    .filter((mod) => mod.status === "onHand" || mod.status === "installed")
     .reduce((sum, mod) => sum + calcTotal(mod.price_min, mod.price_max).low, 0);
   const plannedValue = allMods.reduce(
     (sum, mod) => sum + calcTotal(mod.price_min, mod.price_max).low,
@@ -240,9 +240,9 @@ export function CarHeader({ car, onUpdate }: Props) {
             </div>
             <div className="rounded-lg border border-amber-900/40 bg-amber-900/10 px-3 py-2.5">
               <p className="text-[10px] uppercase tracking-widest text-amber-300/70">
-                Bought
+                On Hand
               </p>
-              <p className="text-lg font-black text-amber-300">{boughtCount}</p>
+              <p className="text-lg font-black text-amber-300">{onHandCount}</p>
             </div>
             <div className="rounded-lg border border-emerald-900/40 bg-emerald-900/10 px-3 py-2.5">
               <p className="text-[10px] uppercase tracking-widest text-emerald-300/70">

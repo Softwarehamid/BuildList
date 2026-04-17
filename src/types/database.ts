@@ -50,7 +50,7 @@ export interface Mod {
   created_at: string;
 }
 
-export type ModStatus = "planned" | "bought" | "installed";
+export type ModStatus = "planned" | "onHand" | "installed";
 
 export interface CategoryWithMods extends ModCategory {
   mods: Mod[];

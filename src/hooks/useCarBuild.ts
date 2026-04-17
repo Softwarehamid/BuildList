@@ -34,13 +34,13 @@ interface ParsedImportBuild {
 function parseStatusFromNotes(notes: string | null): ModStatus | null {
   if (!notes) return null;
   const match = notes.match(
-    /(?:^|\n)\s*status:\s*(planned|bought|installed)\b/im,
+    /(?:^|\n)\s*status:\s*(planned|bought|onHand|installed)\b/im,
   );
   if (!match) return null;
 
   const normalized = match[1].toLowerCase();
   if (normalized === "installed") return "installed";
-  if (normalized === "bought") return "bought";
+  if (normalized === "bought" || normalized === "onhand") return "onHand";
   if (normalized === "planned") return "planned";
   return null;
 }
@@ -49,13 +49,9 @@ function normalizeStatusValue(
   status: string | null | undefined,
 ): ModStatus | null {
   const normalized = status?.trim().toLowerCase();
-  if (
-    normalized === "planned" ||
-    normalized === "bought" ||
-    normalized === "installed"
-  ) {
-    return normalized;
-  }
+  if (normalized === "planned") return "planned";
+  if (normalized === "installed") return "installed";
+  if (normalized === "onhand" || normalized === "bought") return "onHand";
 
   return null;
 }

@@ -13,7 +13,10 @@ function stripStatusMarker(notes: string | null): string {
   if (!notes) return "";
 
   return notes
-    .replace(/(^|\n)\s*status:\s*(planned|bought|installed)\b\s*\n?/gi, "$1")
+    .replace(
+      /(^|\n)\s*status:\s*(planned|bought|onHand|installed)\b\s*\n?/gi,
+      "$1",
+    )
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -27,7 +30,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
   const [status, setStatus] = useState<ModStatus>(mod.status ?? "planned");
   const [notes, setNotes] = useState(stripStatusMarker(mod.notes));
 
-  const statusOrder: ModStatus[] = ["planned", "bought", "installed"];
+  const statusOrder: ModStatus[] = ["planned", "onHand", "installed"];
 
   const getNextStatus = (value: ModStatus): ModStatus => {
     const index = statusOrder.indexOf(value);
@@ -38,7 +41,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
     if (value === "installed") {
       return "text-emerald-300 bg-emerald-900/30 border-emerald-700/60";
     }
-    if (value === "bought") {
+    if (value === "onHand") {
       return "text-amber-300 bg-amber-900/30 border-amber-700/60";
     }
     return "text-sky-300 bg-sky-900/30 border-sky-700/60";
@@ -46,7 +49,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
 
   const getStatusIndicator = (value: ModStatus): string => {
     if (value === "installed") return "INS";
-    if (value === "bought") return "BUY";
+    if (value === "onHand") return "BUY";
     return "PLN";
   };
 
@@ -126,7 +129,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
           onChange={(e) => setStatus(e.target.value as ModStatus)}
         >
           <option value="planned">Planned</option>
-          <option value="bought">Bought</option>
+          <option value="onHand">On Hand</option>
           <option value="installed">Installed</option>
         </select>
         <textarea
@@ -168,7 +171,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
         <button
           onClick={cycleStatus}
           className={`w-12 text-[10px] uppercase tracking-wide font-semibold text-center px-1.5 py-1 rounded-full border transition-all active:scale-95 ${getStatusClasses(mod.status ?? "planned")}`}
-          title="Cycle status: Planned -> Bought -> Installed"
+          title="Cycle status: Planned -> On Hand -> Installed"
         >
           {getStatusIndicator(mod.status ?? "planned")}
         </button>
