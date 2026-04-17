@@ -137,6 +137,9 @@ export function CarHeader({ car, onUpdate }: Props) {
     (sum, mod) => sum + calcTotal(mod.price_min, mod.price_max).low,
     0,
   );
+  const remainingValue = plannedValue - spentValue;
+  const budgetUsedPercent =
+    plannedValue > 0 ? Math.round((spentValue / plannedValue) * 100) : 0;
   const installedProgress =
     totalParts > 0 ? Math.round((installedCount / totalParts) * 100) : 0;
 
@@ -230,8 +233,58 @@ export function CarHeader({ car, onUpdate }: Props) {
           />
         </div>
 
-        <div className="mt-6 pt-5 border-t border-[#1a1a1a] space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="mt-6 pt-5 border-t border-[#1a1a1a] space-y-5">
+          {/* Money Stats (Primary Focus) */}
+          <div className="bg-gradient-to-br from-red-900/20 to-orange-900/10 border border-red-900/40 rounded-xl p-4">
+            <p className="text-[10px] uppercase tracking-widest text-red-400/70 font-semibold mb-3">
+              Build Budget
+            </p>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Spent</p>
+                <p className="text-2xl font-black text-red-400">
+                  {fmt(spentValue)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Planned</p>
+                <p className="text-2xl font-black text-white">
+                  {fmt(plannedValue)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Remaining</p>
+                <p
+                  className={`text-2xl font-black ${remainingValue > 0 ? "text-green-400" : "text-red-400"}`}
+                >
+                  {fmt(remainingValue)}
+                </p>
+              </div>
+            </div>
+            <div className="mt-3">
+              <div className="flex items-center justify-between text-xs mb-1.5">
+                <p className="text-gray-400">Budget Used</p>
+                <p className="text-gray-300 font-semibold">
+                  {budgetUsedPercent}%
+                </p>
+              </div>
+              <div className="h-2.5 rounded-full bg-[#1a1a1a] overflow-hidden border border-red-900/30">
+                <div
+                  className={`h-full transition-all duration-300 ${
+                    budgetUsedPercent <= 80
+                      ? "bg-gradient-to-r from-green-500 to-emerald-400"
+                      : budgetUsedPercent <= 95
+                        ? "bg-gradient-to-r from-yellow-500 to-amber-400"
+                        : "bg-gradient-to-r from-red-500 to-orange-400"
+                  }`}
+                  style={{ width: `${budgetUsedPercent}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Part Status Metrics */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <div className="rounded-lg border border-[#262626] bg-[#121212] px-3 py-2.5">
               <p className="text-[10px] uppercase tracking-widest text-gray-500">
                 Total Parts
@@ -252,19 +305,12 @@ export function CarHeader({ car, onUpdate }: Props) {
                 {installedCount}
               </p>
             </div>
-            <div className="rounded-lg border border-[#262626] bg-[#121212] px-3 py-2.5">
-              <p className="text-[10px] uppercase tracking-widest text-gray-500">
-                Spent / Planned
-              </p>
-              <p className="text-sm md:text-base font-black text-white">
-                {fmt(spentValue)} / {fmt(plannedValue)}
-              </p>
-            </div>
           </div>
 
+          {/* Install Progress */}
           <div>
             <div className="flex items-center justify-between text-xs mb-1.5">
-              <p className="text-gray-400">Installed Progress</p>
+              <p className="text-gray-400">Install Progress</p>
               <p className="text-gray-300 font-semibold">
                 {installedCount}/{totalParts || 0} ({installedProgress}%)
               </p>
