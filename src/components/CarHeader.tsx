@@ -143,6 +143,11 @@ export function CarHeader({ car, onUpdate }: Props) {
   const installedProgress =
     totalParts > 0 ? Math.round((installedCount / totalParts) * 100) : 0;
 
+  const nextUpMods = allMods
+    .filter((mod) => mod.status === "onHand")
+    .sort((a, b) => (a.notes ?? "").localeCompare(b.notes ?? ""))
+    .slice(0, 5);
+
   const fmt = (n: number) =>
     n.toLocaleString("en-US", {
       style: "currency",
@@ -322,6 +327,35 @@ export function CarHeader({ car, onUpdate }: Props) {
               />
             </div>
           </div>
+
+          {/* Next Up Section */}
+          {nextUpMods.length > 0 && (
+            <div className="bg-gradient-to-br from-blue-900/20 to-indigo-900/10 border border-blue-900/40 rounded-xl p-3">
+              <p className="text-[10px] uppercase tracking-widest text-blue-400/70 font-semibold mb-2">
+                🎯 Next Up (Awaiting Install)
+              </p>
+              <div className="space-y-1.5">
+                {nextUpMods.map((mod) => (
+                  <div key={mod.id} className="flex items-start gap-2 text-xs">
+                    <div className="w-1 h-1 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />
+                    <div className="min-w-0">
+                      <p className="text-gray-200 truncate">{mod.name}</p>
+                      {mod.notes && (
+                        <p className="text-gray-500 text-[11px] italic line-clamp-1">
+                          {mod.notes}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {onHandCount > 5 && (
+                <p className="text-[10px] text-gray-500 mt-2 pt-2 border-t border-blue-900/30">
+                  +{onHandCount - 5} more waiting...
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
