@@ -63,6 +63,11 @@ export default function App() {
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
   const [importing, setImporting] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string[]>([
+    "planned",
+    "onHand",
+    "installed",
+  ]);
 
   const handleAddCar = async (car: {
     name: string;
@@ -177,6 +182,7 @@ export default function App() {
         <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start">
           <Sidebar
             cars={cars}
+            selectedCar={selectedCar}
             selectedCarId={selectedCar?.id}
             onSelect={selectCar}
             onAddCar={handleAddCar}
@@ -196,6 +202,46 @@ export default function App() {
                   onUpdate={(updates) => updateCar(selectedCar.id, updates)}
                 />
 
+                {/* Quick Filters */}
+                <div className="flex items-center gap-2 px-0.5">
+                  <span className="text-[10px] uppercase tracking-widest text-gray-600 font-semibold">
+                    Filter:
+                  </span>
+                  {["planned", "onHand", "installed"].map((status) => {
+                    const labels: Record<string, string> = {
+                      planned: "Planned",
+                      onHand: "On Hand",
+                      installed: "Installed",
+                    };
+                    const colors: Record<string, string> = {
+                      planned: statusFilter.includes(status)
+                        ? "border-sky-500 bg-sky-900/30 text-sky-300"
+                        : "border-sky-900/50 bg-sky-900/10 text-sky-500/50",
+                      onHand: statusFilter.includes(status)
+                        ? "border-amber-500 bg-amber-900/30 text-amber-300"
+                        : "border-amber-900/50 bg-amber-900/10 text-amber-500/50",
+                      installed: statusFilter.includes(status)
+                        ? "border-emerald-500 bg-emerald-900/30 text-emerald-300"
+                        : "border-emerald-900/50 bg-emerald-900/10 text-emerald-500/50",
+                    };
+                    return (
+                      <button
+                        key={status}
+                        onClick={() =>
+                          setStatusFilter((f) =>
+                            f.includes(status)
+                              ? f.filter((s) => s !== status)
+                              : [...f, status],
+                          )
+                        }
+                        className={`text-xs font-semibold px-2.5 py-1.5 rounded-md border transition-all ${colors[status]}`}
+                      >
+                        {labels[status as keyof typeof labels]}
+                      </button>
+                    );
+                  })}
+                </div>
+
                 <div className="space-y-3 pt-2">
                   {orderedBlocks.map((block, blockIndex) => {
                     if (block.type === "regular") {
@@ -209,6 +255,7 @@ export default function App() {
                         <CategorySection
                           key={cat.id}
                           category={cat}
+                          statusFilter={statusFilter}
                           canMoveUp={currentRegularIndex > 0}
                           canMoveDown={
                             currentRegularIndex < regularIds.length - 1
@@ -317,6 +364,7 @@ export default function App() {
                                   key={cat.id}
                                   category={cat}
                                   displayName={displayName}
+                                  statusFilter={statusFilter}
                                   canMoveUp={index > 0}
                                   canMoveDown={index < powerStages.length - 1}
                                   onMoveUp={(id) =>

@@ -206,9 +206,12 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
 
   const getTagBadge = (t: string | null) => {
     const baseBadge = "text-[10px] font-semibold px-2 py-1 rounded border";
-    if (t === "WAIT") return `${baseBadge} border-orange-500/60 bg-orange-900/20 text-orange-300`;
-    if (t === "BATCH") return `${baseBadge} border-purple-500/60 bg-purple-900/20 text-purple-300`;
-    if (t === "HOLD") return `${baseBadge} border-red-500/60 bg-red-900/20 text-red-300`;
+    if (t === "WAIT")
+      return `${baseBadge} border-orange-500/60 bg-orange-900/20 text-orange-300`;
+    if (t === "BATCH")
+      return `${baseBadge} border-purple-500/60 bg-purple-900/20 text-purple-300`;
+    if (t === "HOLD")
+      return `${baseBadge} border-red-500/60 bg-red-900/20 text-red-300`;
     return "";
   };
 

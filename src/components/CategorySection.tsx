@@ -17,6 +17,7 @@ import { formatPrice, calcTotal } from "../lib/utils";
 interface Props {
   category: CategoryWithMods;
   displayName?: string;
+  statusFilter?: string[];
   canMoveUp: boolean;
   canMoveDown: boolean;
   onMoveUp: (id: string) => void;
@@ -53,6 +54,7 @@ function getCategoryColor(name: string): string {
 export function CategorySection({
   category,
   displayName,
+  statusFilter = ["planned", "onHand", "installed"],
   canMoveUp,
   canMoveDown,
   onMoveUp,
@@ -88,6 +90,15 @@ export function CategorySection({
     totalLow,
     totalHigh === totalLow ? totalLow : totalHigh,
   );
+
+  const statusOrder = ["planned", "onHand", "installed"];
+  const sortedMods = [...category.mods]
+    .filter((mod) => statusFilter.includes(mod.status ?? "planned"))
+    .sort((a, b) => {
+      const aIndex = statusOrder.indexOf(a.status ?? "planned");
+      const bIndex = statusOrder.indexOf(b.status ?? "planned");
+      return aIndex - bIndex;
+    });
 
   const saveName = () => {
     onUpdateCategory(category.id, nameInput);
@@ -215,7 +226,7 @@ export function CategorySection({
               No parts yet
             </p>
           )}
-          {category.mods.map((mod) => (
+          {sortedMods.map((mod) => (
             <ModItem
               key={mod.id}
               mod={mod}
