@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pencil, Check, X, Car } from "lucide-react";
+import { Pencil, Check, X, Car, ChevronRight } from "lucide-react";
 import type { CarWithCategories } from "../types/database";
 import { calcTotal } from "../lib/utils";
 
@@ -208,6 +208,17 @@ export function CarHeader({ car, onUpdate }: Props) {
             <p className="text-gray-600 text-xs mt-1.5">
               {totalParts} parts across {car.categories.length} categories
             </p>
+            <div className="flex items-center gap-1.5 mt-2">
+              <div className="flex items-center gap-1 text-[10px]">
+                <span className="text-sky-400 font-semibold">Planned</span>
+                <ChevronRight size={12} className="text-gray-600" />
+                <span className="text-amber-400 font-semibold">On Hand</span>
+                <ChevronRight size={12} className="text-gray-600" />
+                <span className="text-emerald-400 font-semibold">
+                  Installed
+                </span>
+              </div>
+            </div>
           </div>
 
           <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-5 py-3 text-right">
