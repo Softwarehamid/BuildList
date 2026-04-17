@@ -17,8 +17,21 @@ function stripStatusMarker(notes: string | null): string {
       /(^|\n)\s*status:\s*(planned|bought|onHand|installed)\b\s*\n?/gi,
       "$1",
     )
+    .replace(/\b#(WAIT|BATCH|HOLD)\b\s*/gi, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function extractTag(notes: string | null): string | null {
+  if (!notes) return null;
+  const match = notes.match(/\b#(WAIT|BATCH|HOLD)\b/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
+function appendTag(notes: string | null, tag: string | null): string | null {
+  let cleaned = stripStatusMarker(notes);
+  if (!tag) return cleaned || null;
+  return cleaned ? `#${tag}\n${cleaned}` : `#${tag}`;
 }
 
 export function ModItem({ mod, onUpdate, onDelete }: Props) {
@@ -29,6 +42,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
   const [url, setUrl] = useState(mod.url ?? "");
   const [status, setStatus] = useState<ModStatus>(mod.status ?? "planned");
   const [notes, setNotes] = useState(stripStatusMarker(mod.notes));
+  const [tag, setTag] = useState<string | null>(extractTag(mod.notes));
 
   const statusOrder: ModStatus[] = ["planned", "onHand", "installed"];
 
@@ -55,6 +69,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
 
   const save = () => {
     const cleanedNotes = stripStatusMarker(notes);
+    const finalNotes = appendTag(cleanedNotes, tag);
 
     onUpdate(mod.id, {
       name,
@@ -62,7 +77,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
       price_max: priceMax ? parseFloat(priceMax) : null,
       url: url || null,
       status,
-      notes: cleanedNotes ? cleanedNotes : null,
+      notes: finalNotes,
     });
     setEditing(false);
   };
@@ -74,6 +89,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
     setUrl(mod.url ?? "");
     setStatus(mod.status ?? "planned");
     setNotes(stripStatusMarker(mod.notes));
+    setTag(extractTag(mod.notes));
     setEditing(false);
   };
 
@@ -85,6 +101,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
     setUrl(mod.url ?? "");
     setStatus(mod.status ?? "planned");
     setNotes(stripStatusMarker(mod.notes));
+    setTag(extractTag(mod.notes));
   }, [mod, editing]);
 
   const cycleStatus = () => {
@@ -132,6 +149,30 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
           <option value="onHand">On Hand</option>
           <option value="installed">Installed</option>
         </select>
+        <div>
+          <label className="text-[10px] uppercase tracking-widest text-gray-500 font-medium mb-1.5 block">
+            Tag (optional)
+          </label>
+          <div className="flex gap-2">
+            {["WAIT", "BATCH", "HOLD"].map((t) => (
+              <button
+                key={t}
+                onClick={() => setTag(tag === t ? null : t)}
+                className={`flex-1 text-xs font-semibold px-2 py-1.5 rounded-md border transition-colors ${
+                  tag === t
+                    ? t === "WAIT"
+                      ? "border-orange-500 bg-orange-900/30 text-orange-300"
+                      : t === "BATCH"
+                        ? "border-purple-500 bg-purple-900/30 text-purple-300"
+                        : "border-red-500 bg-red-900/30 text-red-300"
+                    : "border-[#333] bg-[#0f0f0f] text-gray-400 hover:border-gray-600"
+                }`}
+              >
+                #{t}
+              </button>
+            ))}
+          </div>
+        </div>
         <textarea
           className="w-full min-h-20 bg-[#0f0f0f] border border-[#333] text-white text-sm rounded-md px-3 py-2 focus:outline-none focus:border-red-600"
           value={notes}
@@ -161,6 +202,16 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
     mod.price_max !== null &&
     mod.price_min !== mod.price_max;
 
+  const modTag = extractTag(mod.notes);
+
+  const getTagBadge = (t: string | null) => {
+    const baseBadge = "text-[10px] font-semibold px-2 py-1 rounded border";
+    if (t === "WAIT") return `${baseBadge} border-orange-500/60 bg-orange-900/20 text-orange-300`;
+    if (t === "BATCH") return `${baseBadge} border-purple-500/60 bg-purple-900/20 text-purple-300`;
+    if (t === "HOLD") return `${baseBadge} border-red-500/60 bg-red-900/20 text-red-300`;
+    return "";
+  };
+
   return (
     <div className="group flex items-center justify-between gap-3 py-2.5 px-3 rounded-lg border border-transparent hover:border-[#2a2a2a] hover:bg-[#181818] hover:shadow-[0_6px_24px_rgba(0,0,0,0.22)] hover:-translate-y-[1px] transition-all">
       <div className="flex items-start gap-3 min-w-0">
@@ -175,6 +226,11 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
         >
           {getStatusIndicator(mod.status ?? "planned")}
         </button>
+        {modTag && (
+          <span className={getTagBadge(modTag)} title={`Tagged: ${modTag}`}>
+            #{modTag}
+          </span>
+        )}
         <span
           className={`text-sm font-medium tabular-nums ${mod.price_min === null && mod.price_max === null ? "text-gray-500 italic" : isRange ? "text-amber-400" : "text-green-400"}`}
         >
