@@ -72,6 +72,12 @@ function isStatusColumnMissingError(message: string): boolean {
   return /status.*column|column.*status|schema cache/i.test(message);
 }
 
+function isCarOrderColumnMissingError(message: string): boolean {
+  return /display_order.*column|column.*display_order|schema cache/i.test(
+    message,
+  );
+}
+
 function makeStatusNote(status: ModStatus): string {
   const title = status.charAt(0).toUpperCase() + status.slice(1);
   return `Status: ${title}`;
@@ -216,10 +222,22 @@ export function useCarBuild() {
     const client = getClient();
     if (!client) return;
 
-    const { data, error } = await client
+    let { data, error } = await client
       .from("cars")
       .select("*")
+      .order("display_order", { ascending: true })
       .order("created_at", { ascending: true });
+
+    if (error && isCarOrderColumnMissingError(error.message)) {
+      const fallbackResult = await client
+        .from("cars")
+        .select("*")
+        .order("created_at", { ascending: true });
+
+      data = fallbackResult.data;
+      error = fallbackResult.error;
+    }
+
     if (error) {
       setError(error.message);
       return;
@@ -340,11 +358,34 @@ export function useCarBuild() {
       const client = getClient();
       if (!client) return null;
 
-      const { data, error } = await client
+      const maxOrder = cars.reduce(
+        (m, c) => Math.max(m, c.display_order ?? 0),
+        0,
+      );
+
+      const insertPayload = {
+        ...car,
+        image_url: null,
+        display_order: maxOrder + 1,
+      };
+
+      let { data, error } = await client
         .from("cars")
-        .insert(car)
+        .insert(insertPayload)
         .select()
         .maybeSingle();
+
+      if (error && isCarOrderColumnMissingError(error.message)) {
+        const fallbackResult = await client
+          .from("cars")
+          .insert({ ...car, image_url: null })
+          .select()
+          .maybeSingle();
+
+        data = fallbackResult.data;
+        error = fallbackResult.error;
+      }
+
       if (error) {
         setError(error.message);
         return null;
@@ -352,7 +393,7 @@ export function useCarBuild() {
       await fetchCars();
       return data;
     },
-    [fetchCars, getClient],
+    [cars, fetchCars, getClient],
   );
 
   const updateCar = useCallback(
@@ -391,6 +432,55 @@ export function useCarBuild() {
       }
     },
     [fetchCars, fetchCarDetails, getClient],
+  );
+
+  const moveCarInList = useCallback(
+    async (
+      orderedCarIds: string[],
+      carId: string,
+      direction: "up" | "down",
+    ) => {
+      const client = getClient();
+      if (!client) return;
+
+      const currentIndex = orderedCarIds.findIndex((id) => id === carId);
+      if (currentIndex === -1) return;
+
+      const targetIndex =
+        direction === "up" ? currentIndex - 1 : currentIndex + 1;
+      if (targetIndex < 0 || targetIndex >= orderedCarIds.length) return;
+
+      const currentCar = cars.find((c) => c.id === carId);
+      const targetCar = cars.find((c) => c.id === orderedCarIds[targetIndex]);
+      if (!currentCar || !targetCar) return;
+
+      const updates = [
+        { id: currentCar.id, display_order: targetCar.display_order },
+        { id: targetCar.id, display_order: currentCar.display_order },
+      ];
+
+      for (const update of updates) {
+        const { error } = await client
+          .from("cars")
+          .update({ display_order: update.display_order })
+          .eq("id", update.id);
+
+        if (error) {
+          if (isCarOrderColumnMissingError(error.message)) {
+            setError(
+              "Car reordering needs the latest migration. Run migrations and try again.",
+            );
+            return;
+          }
+
+          setError(error.message);
+          return;
+        }
+      }
+
+      await fetchCars();
+    },
+    [cars, fetchCars, getClient],
   );
 
   const addCategory = useCallback(
@@ -881,6 +971,7 @@ export function useCarBuild() {
     addCar,
     updateCar,
     deleteCar,
+    moveCarInList,
     addCategory,
     addPowerStage,
     importBuildFromText,

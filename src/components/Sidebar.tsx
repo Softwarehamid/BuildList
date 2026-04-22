@@ -7,7 +7,8 @@ import {
   X,
   Check,
   Gauge,
-  BarChart3,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import type { Car as CarType, CarWithCategories } from "../types/database";
 
@@ -22,6 +23,7 @@ interface Props {
     out_the_door_price: number | null;
     down_payment: number | null;
   }) => void;
+  onMoveCar: (id: string, direction: "up" | "down") => void;
   onDeleteCar: (id: string) => void;
 }
 
@@ -31,6 +33,7 @@ export function Sidebar({
   selectedCarId,
   onSelect,
   onAddCar,
+  onMoveCar,
   onDeleteCar,
 }: Props) {
   const [adding, setAdding] = useState(false);
@@ -77,7 +80,7 @@ export function Sidebar({
           </span>
         </div>
         <div className="divide-y divide-[#1a1a1a]">
-          {cars.map((car) => {
+          {cars.map((car, index) => {
             const progress = getCarProgress(car.id);
             return (
               <div
@@ -102,6 +105,28 @@ export function Sidebar({
                   {selectedCarId === car.id && (
                     <ChevronRight size={12} className="text-red-500" />
                   )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMoveCar(car.id, "up");
+                    }}
+                    className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-gray-300 transition-all p-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
+                    disabled={index === 0}
+                    aria-label="Move build up"
+                  >
+                    <ArrowUp size={11} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMoveCar(car.id, "down");
+                    }}
+                    className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-gray-300 transition-all p-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
+                    disabled={index === cars.length - 1}
+                    aria-label="Move build down"
+                  >
+                    <ArrowDown size={11} />
+                  </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();

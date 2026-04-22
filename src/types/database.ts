@@ -23,6 +23,7 @@ export interface Database {
 export interface Car {
   id: string;
   name: string;
+  display_order: number;
   base_price: number | null;
   out_the_door_price: number | null;
   down_payment: number | null;

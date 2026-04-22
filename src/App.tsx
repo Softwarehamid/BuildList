@@ -45,6 +45,7 @@ export default function App() {
     addCar,
     updateCar,
     deleteCar,
+    moveCarInList,
     addCategory,
     addPowerStage,
     importBuildFromText,
@@ -92,6 +93,11 @@ export default function App() {
     setImporting(true);
     await importBuildFromText(importText);
     setImporting(false);
+  };
+
+  const moveCar = (id: string, direction: "up" | "down") => {
+    const orderedCarIds = cars.map((car) => car.id);
+    moveCarInList(orderedCarIds, id, direction);
   };
 
   const orderedCategories = selectedCar
@@ -186,6 +192,7 @@ export default function App() {
             selectedCarId={selectedCar?.id}
             onSelect={selectCar}
             onAddCar={handleAddCar}
+            onMoveCar={moveCar}
             onDeleteCar={deleteCar}
           />
 

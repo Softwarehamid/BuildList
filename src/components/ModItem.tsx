@@ -63,7 +63,7 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
 
   const getStatusIndicator = (value: ModStatus): string => {
     if (value === "installed") return "INS";
-    if (value === "onHand") return "BUY";
+    if (value === "onHand") return "HND";
     return "PLN";
   };
 
