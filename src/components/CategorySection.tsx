@@ -7,6 +7,8 @@ import {
   Trash2,
   X,
   Check,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import type { CategoryWithMods, Mod } from "../types/database";
 import { ModItem } from "./ModItem";
@@ -16,10 +18,14 @@ interface Props {
   category: CategoryWithMods;
   displayName?: string;
   statusFilter?: string[];
-  onReorderMods: (
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  onMoveUp: (id: string) => void;
+  onMoveDown: (id: string) => void;
+  onMoveMod: (
     categoryId: string,
-    draggedId: string,
-    targetId: string,
+    modId: string,
+    direction: "up" | "down",
   ) => void;
   onUpdateCategory: (id: string, name: string) => void;
   onDeleteCategory: (id: string) => void;
@@ -54,7 +60,11 @@ export function CategorySection({
   category,
   displayName,
   statusFilter = ["planned", "onHand", "installed"],
-  onReorderMods,
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown,
+  onMoveMod,
   onUpdateCategory,
   onDeleteCategory,
   onAddMod,
@@ -65,7 +75,6 @@ export function CategorySection({
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(category.name);
   const [addingMod, setAddingMod] = useState(false);
-  const [draggingModId, setDraggingModId] = useState<string | null>(null);
   const [form, setForm] = useState<AddModForm>({
     name: "",
     priceMin: "",
@@ -173,6 +182,28 @@ export function CategorySection({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  onMoveUp(category.id);
+                }}
+                className="text-gray-600 hover:text-gray-300 transition-colors p-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
+                disabled={!canMoveUp}
+                aria-label="Move category up"
+              >
+                <ArrowUp size={12} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMoveDown(category.id);
+                }}
+                className="text-gray-600 hover:text-gray-300 transition-colors p-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
+                disabled={!canMoveDown}
+                aria-label="Move category down"
+              >
+                <ArrowDown size={12} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
                   setEditingName(true);
                 }}
                 className="text-gray-600 hover:text-gray-400 transition-colors p-0.5"
@@ -205,26 +236,33 @@ export function CategorySection({
               No parts yet
             </p>
           )}
-          {sortedMods.map((mod) => (
-            <div
-              key={mod.id}
-              draggable
-              onDragStart={() => setDraggingModId(mod.id)}
-              onDragEnd={() => setDraggingModId(null)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (draggingModId && draggingModId !== mod.id) {
-                  onReorderMods(category.id, draggingModId, mod.id);
-                }
-              }}
-              className={`${draggingModId === mod.id ? "opacity-60" : "opacity-100"} cursor-grab active:cursor-grabbing`}
-            >
-              <ModItem
-                mod={mod}
-                onUpdate={onUpdateMod}
-                onDelete={onDeleteMod}
-              />
+          {sortedMods.map((mod, index) => (
+            <div key={mod.id} className="flex items-center gap-1">
+              <div className="flex flex-col gap-0.5">
+                <button
+                  onClick={() => onMoveMod(category.id, mod.id, "up")}
+                  className="text-gray-600 hover:text-gray-300 transition-colors p-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
+                  disabled={index === 0}
+                  aria-label="Move part up"
+                >
+                  <ArrowUp size={11} />
+                </button>
+                <button
+                  onClick={() => onMoveMod(category.id, mod.id, "down")}
+                  className="text-gray-600 hover:text-gray-300 transition-colors p-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
+                  disabled={index === sortedMods.length - 1}
+                  aria-label="Move part down"
+                >
+                  <ArrowDown size={11} />
+                </button>
+              </div>
+              <div className="flex-1">
+                <ModItem
+                  mod={mod}
+                  onUpdate={onUpdateMod}
+                  onDelete={onDeleteMod}
+                />
+              </div>
             </div>
           ))}
 

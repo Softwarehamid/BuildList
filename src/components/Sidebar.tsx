@@ -1,5 +1,15 @@
 import { useState } from "react";
-import { Plus, Car, Trash2, ChevronRight, X, Check, Gauge } from "lucide-react";
+import {
+  Plus,
+  Car,
+  Trash2,
+  ChevronRight,
+  X,
+  Check,
+  Gauge,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
 import type { Car as CarType, CarWithCategories } from "../types/database";
 
 interface Props {
@@ -13,7 +23,7 @@ interface Props {
     out_the_door_price: number | null;
     down_payment: number | null;
   }) => void;
-  onReorderCars: (draggedId: string, targetId: string) => void;
+  onMoveCar: (id: string, direction: "up" | "down") => void;
   onDeleteCar: (id: string) => void;
 }
 
@@ -23,11 +33,10 @@ export function Sidebar({
   selectedCarId,
   onSelect,
   onAddCar,
-  onReorderCars,
+  onMoveCar,
   onDeleteCar,
 }: Props) {
   const [adding, setAdding] = useState(false);
-  const [draggingCarId, setDraggingCarId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     basePrice: "",
@@ -71,22 +80,12 @@ export function Sidebar({
           </span>
         </div>
         <div className="divide-y divide-[#1a1a1a]">
-          {cars.map((car) => {
+          {cars.map((car, index) => {
             const progress = getCarProgress(car.id);
             return (
               <div
                 key={car.id}
-                draggable
-                onDragStart={() => setDraggingCarId(car.id)}
-                onDragEnd={() => setDraggingCarId(null)}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (draggingCarId && draggingCarId !== car.id) {
-                    onReorderCars(draggingCarId, car.id);
-                  }
-                }}
-                className={`group flex flex-col gap-1.5 px-3 py-2.5 cursor-grab active:cursor-grabbing transition-colors ${selectedCarId === car.id ? "bg-red-950/30" : "hover:bg-white/[0.03]"} ${draggingCarId === car.id ? "opacity-60" : "opacity-100"}`}
+                className={`group flex flex-col gap-1.5 px-3 py-2.5 cursor-pointer transition-colors ${selectedCarId === car.id ? "bg-red-950/30" : "hover:bg-white/[0.03]"}`}
                 onClick={() => onSelect(car.id)}
               >
                 <div className="flex items-center gap-2">
@@ -106,6 +105,28 @@ export function Sidebar({
                   {selectedCarId === car.id && (
                     <ChevronRight size={12} className="text-red-500" />
                   )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMoveCar(car.id, "up");
+                    }}
+                    className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-gray-300 transition-all p-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
+                    disabled={index === 0}
+                    aria-label="Move build up"
+                  >
+                    <ArrowUp size={11} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMoveCar(car.id, "down");
+                    }}
+                    className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-gray-300 transition-all p-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
+                    disabled={index === cars.length - 1}
+                    aria-label="Move build down"
+                  >
+                    <ArrowDown size={11} />
+                  </button>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
