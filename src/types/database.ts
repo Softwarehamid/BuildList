@@ -13,7 +13,9 @@ export interface Database {
       };
       mods: {
         Row: Mod;
-        Insert: Omit<Mod, "id" | "created_at">;
+        Insert: Omit<Mod, "id" | "created_at" | "display_order"> & {
+          display_order?: number;
+        };
         Update: Partial<Omit<Mod, "id" | "created_at">>;
       };
     };
@@ -43,6 +45,7 @@ export interface Mod {
   id: string;
   category_id: string;
   name: string;
+  display_order: number;
   price_min: number | null;
   price_max: number | null;
   url: string | null;

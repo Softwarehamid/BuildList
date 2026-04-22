@@ -5,8 +5,6 @@ import {
   ChevronDown,
   ChevronRight,
   Zap,
-  ArrowUp,
-  ArrowDown,
   FileText,
 } from "lucide-react";
 import { useCarBuild } from "./hooks/useCarBuild";
@@ -45,14 +43,14 @@ export default function App() {
     addCar,
     updateCar,
     deleteCar,
-    moveCarInList,
+    reorderCarsInList,
     addCategory,
     addPowerStage,
     importBuildFromText,
-    movePowerGroup,
+    reorderCategoriesInList,
     updateCategory,
     deleteCategory,
-    moveCategoryInList,
+    reorderModsInCategory,
     addMod,
     updateMod,
     deleteMod,
@@ -64,6 +62,10 @@ export default function App() {
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
   const [importing, setImporting] = useState(false);
+  const [draggingCategoryId, setDraggingCategoryId] = useState<string | null>(
+    null,
+  );
+  const [draggingBlockId, setDraggingBlockId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string[]>([
     "planned",
     "onHand",
@@ -95,9 +97,97 @@ export default function App() {
     setImporting(false);
   };
 
-  const moveCar = (id: string, direction: "up" | "down") => {
+  const reorderByDrop = (
+    orderedIds: string[],
+    draggedId: string,
+    targetId: string,
+  ) => {
+    const fromIndex = orderedIds.indexOf(draggedId);
+    const toIndex = orderedIds.indexOf(targetId);
+    if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
+      return orderedIds;
+    }
+
+    const next = [...orderedIds];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    return next;
+  };
+
+  const handleReorderCars = (draggedId: string, targetId: string) => {
     const orderedCarIds = cars.map((car) => car.id);
-    moveCarInList(orderedCarIds, id, direction);
+    const reordered = reorderByDrop(orderedCarIds, draggedId, targetId);
+    reorderCarsInList(reordered);
+  };
+
+  const reorderSubsetInFullOrder = (
+    fullOrder: string[],
+    subsetCurrentOrder: string[],
+    subsetReordered: string[],
+  ) => {
+    const subsetSet = new Set(subsetCurrentOrder);
+    let idx = 0;
+    return fullOrder.map((id) => {
+      if (!subsetSet.has(id)) return id;
+      const next = subsetReordered[idx];
+      idx += 1;
+      return next;
+    });
+  };
+
+  const handleReorderPowerStages = (draggedId: string, targetId: string) => {
+    if (!selectedCar) return;
+    const reorderedPower = reorderByDrop(powerStageIds, draggedId, targetId);
+    const fullOrder = orderedCategories.map((c) => c.id);
+    const reorderedFull = reorderSubsetInFullOrder(
+      fullOrder,
+      powerStageIds,
+      reorderedPower,
+    );
+    reorderCategoriesInList(selectedCar.id, reorderedFull);
+  };
+
+  const handleReorderMods = (
+    categoryId: string,
+    draggedId: string,
+    targetId: string,
+  ) => {
+    if (!selectedCar) return;
+    const category = selectedCar.categories.find((c) => c.id === categoryId);
+    if (!category) return;
+
+    const orderedModIds = [...category.mods]
+      .sort((a, b) => {
+        const aOrder = a.display_order ?? Number.MAX_SAFE_INTEGER;
+        const bOrder = b.display_order ?? Number.MAX_SAFE_INTEGER;
+        return aOrder - bOrder;
+      })
+      .map((m) => m.id);
+
+    const reordered = reorderByDrop(orderedModIds, draggedId, targetId);
+    reorderModsInCategory(selectedCar.id, reordered);
+  };
+
+  const POWER_BLOCK_ID = "__power_block__";
+
+  const handleReorderCategoryBlocks = (draggedId: string, targetId: string) => {
+    if (!selectedCar) return;
+
+    const blockIds = orderedBlocks.map((block) =>
+      block.type === "power" ? POWER_BLOCK_ID : block.categoryId,
+    );
+    const reorderedBlocks = reorderByDrop(blockIds, draggedId, targetId);
+
+    const reorderedCategoryIds: string[] = [];
+    for (const blockId of reorderedBlocks) {
+      if (blockId === POWER_BLOCK_ID) {
+        reorderedCategoryIds.push(...powerStageIds);
+      } else {
+        reorderedCategoryIds.push(blockId);
+      }
+    }
+
+    reorderCategoriesInList(selectedCar.id, reorderedCategoryIds);
   };
 
   const orderedCategories = selectedCar
@@ -138,27 +228,7 @@ export default function App() {
   const regularById = new Map(
     regularCategories.map((category) => [category.id, category]),
   );
-  const regularIds = regularCategories.map((category) => category.id);
   const powerStageIds = powerStages.map((category) => category.id);
-
-  const powerBlockIndex = orderedBlocks.findIndex(
-    (block) => block.type === "power",
-  );
-  const hasPowerStages = powerStages.length > 0;
-  const canMovePowerUp = hasPowerStages && powerBlockIndex > 0;
-  const canMovePowerDown =
-    hasPowerStages &&
-    powerBlockIndex !== -1 &&
-    powerBlockIndex < orderedBlocks.length - 1;
-
-  const moveInOrderedSet = (
-    orderedIds: string[],
-    categoryId: string,
-    direction: "up" | "down",
-  ) => {
-    if (!selectedCar) return;
-    moveCategoryInList(selectedCar.id, orderedIds, categoryId, direction);
-  };
 
   if (loading && cars.length === 0) {
     return (
@@ -192,7 +262,7 @@ export default function App() {
             selectedCarId={selectedCar?.id}
             onSelect={selectCar}
             onAddCar={handleAddCar}
-            onMoveCar={moveCar}
+            onReorderCars={handleReorderCars}
             onDeleteCar={deleteCar}
           />
 
@@ -253,47 +323,71 @@ export default function App() {
                   {orderedBlocks.map((block, blockIndex) => {
                     if (block.type === "regular") {
                       const cat = regularById.get(block.categoryId);
-                      const currentRegularIndex = regularIds.indexOf(
-                        block.categoryId,
-                      );
                       if (!cat) return null;
 
                       return (
-                        <CategorySection
+                        <div
                           key={cat.id}
-                          category={cat}
-                          statusFilter={statusFilter}
-                          canMoveUp={currentRegularIndex > 0}
-                          canMoveDown={
-                            currentRegularIndex < regularIds.length - 1
-                          }
-                          onMoveUp={(id) =>
-                            moveInOrderedSet(regularIds, id, "up")
-                          }
-                          onMoveDown={(id) =>
-                            moveInOrderedSet(regularIds, id, "down")
-                          }
-                          onUpdateCategory={(id, name) =>
-                            updateCategory(id, name, selectedCar.id)
-                          }
-                          onDeleteCategory={(id) =>
-                            deleteCategory(id, selectedCar.id)
-                          }
-                          onAddMod={(mod: Omit<Mod, "id" | "created_at">) =>
-                            addMod(mod, selectedCar.id)
-                          }
-                          onUpdateMod={(id, updates) =>
-                            updateMod(id, updates, selectedCar.id)
-                          }
-                          onDeleteMod={(id) => deleteMod(id, selectedCar.id)}
-                        />
+                          draggable
+                          onDragStart={() => setDraggingBlockId(cat.id)}
+                          onDragEnd={() => setDraggingBlockId(null)}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            if (draggingBlockId && draggingBlockId !== cat.id) {
+                              handleReorderCategoryBlocks(
+                                draggingBlockId,
+                                cat.id,
+                              );
+                            }
+                          }}
+                          className={`${draggingBlockId === cat.id ? "opacity-60" : "opacity-100"} cursor-grab active:cursor-grabbing`}
+                        >
+                          <CategorySection
+                            category={cat}
+                            statusFilter={statusFilter}
+                            onReorderMods={handleReorderMods}
+                            onUpdateCategory={(id, name) =>
+                              updateCategory(id, name, selectedCar.id)
+                            }
+                            onDeleteCategory={(id) =>
+                              deleteCategory(id, selectedCar.id)
+                            }
+                            onAddMod={(
+                              mod: Omit<
+                                Mod,
+                                "id" | "created_at" | "display_order"
+                              >,
+                            ) => addMod(mod, selectedCar.id)}
+                            onUpdateMod={(id, updates) =>
+                              updateMod(id, updates, selectedCar.id)
+                            }
+                            onDeleteMod={(id) => deleteMod(id, selectedCar.id)}
+                          />
+                        </div>
                       );
                     }
 
                     return (
                       <section
                         key={`power-block-${blockIndex}`}
-                        className="bg-[#111111] border border-[#1e1e1e] rounded-xl overflow-hidden"
+                        draggable
+                        onDragStart={() => setDraggingBlockId(POWER_BLOCK_ID)}
+                        onDragEnd={() => setDraggingBlockId(null)}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (
+                            draggingBlockId &&
+                            draggingBlockId !== POWER_BLOCK_ID
+                          ) {
+                            handleReorderCategoryBlocks(
+                              draggingBlockId,
+                              POWER_BLOCK_ID,
+                            );
+                          }
+                        }}
+                        className={`bg-[#111111] border border-[#1e1e1e] rounded-xl overflow-hidden ${draggingBlockId === POWER_BLOCK_ID ? "opacity-60" : "opacity-100"} cursor-grab active:cursor-grabbing`}
                       >
                         <div
                           className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
@@ -309,40 +403,16 @@ export default function App() {
                               {powerStages.length === 1 ? "stage" : "stages"}
                             </p>
                           </div>
-                          <div
-                            className="flex items-center gap-1"
-                            onClick={(e) => e.stopPropagation()}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              addPowerStage(selectedCar.id);
+                              setPowerOpen(true);
+                            }}
+                            className="flex items-center gap-1.5 text-xs text-white bg-blue-700 hover:bg-blue-600 px-3 py-1.5 rounded-md transition-colors"
                           >
-                            <button
-                              onClick={() =>
-                                movePowerGroup(selectedCar.id, "up")
-                              }
-                              className="text-gray-600 hover:text-gray-300 transition-colors p-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
-                              disabled={!canMovePowerUp}
-                              aria-label="Move power section up"
-                            >
-                              <ArrowUp size={12} />
-                            </button>
-                            <button
-                              onClick={() =>
-                                movePowerGroup(selectedCar.id, "down")
-                              }
-                              className="text-gray-600 hover:text-gray-300 transition-colors p-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
-                              disabled={!canMovePowerDown}
-                              aria-label="Move power section down"
-                            >
-                              <ArrowDown size={12} />
-                            </button>
-                            <button
-                              onClick={() => {
-                                addPowerStage(selectedCar.id);
-                                setPowerOpen(true);
-                              }}
-                              className="flex items-center gap-1.5 text-xs text-white bg-blue-700 hover:bg-blue-600 px-3 py-1.5 rounded-md transition-colors"
-                            >
-                              <Plus size={12} /> Add Stage
-                            </button>
-                          </div>
+                            <Plus size={12} /> Add Stage
+                          </button>
                           <Zap size={14} className="text-blue-400" />
                           {powerOpen ? (
                             <ChevronDown size={15} className="text-gray-500" />
@@ -367,35 +437,53 @@ export default function App() {
                                 ? `Stage ${stageNumber}`
                                 : cat.name;
                               return (
-                                <CategorySection
+                                <div
                                   key={cat.id}
-                                  category={cat}
-                                  displayName={displayName}
-                                  statusFilter={statusFilter}
-                                  canMoveUp={index > 0}
-                                  canMoveDown={index < powerStages.length - 1}
-                                  onMoveUp={(id) =>
-                                    moveInOrderedSet(powerStageIds, id, "up")
+                                  draggable
+                                  onDragStart={() =>
+                                    setDraggingCategoryId(cat.id)
                                   }
-                                  onMoveDown={(id) =>
-                                    moveInOrderedSet(powerStageIds, id, "down")
-                                  }
-                                  onUpdateCategory={(id, name) =>
-                                    updateCategory(id, name, selectedCar.id)
-                                  }
-                                  onDeleteCategory={(id) =>
-                                    deleteCategory(id, selectedCar.id)
-                                  }
-                                  onAddMod={(
-                                    mod: Omit<Mod, "id" | "created_at">,
-                                  ) => addMod(mod, selectedCar.id)}
-                                  onUpdateMod={(id, updates) =>
-                                    updateMod(id, updates, selectedCar.id)
-                                  }
-                                  onDeleteMod={(id) =>
-                                    deleteMod(id, selectedCar.id)
-                                  }
-                                />
+                                  onDragEnd={() => setDraggingCategoryId(null)}
+                                  onDragOver={(e) => e.preventDefault()}
+                                  onDrop={(e) => {
+                                    e.preventDefault();
+                                    if (
+                                      draggingCategoryId &&
+                                      draggingCategoryId !== cat.id
+                                    ) {
+                                      handleReorderPowerStages(
+                                        draggingCategoryId,
+                                        cat.id,
+                                      );
+                                    }
+                                  }}
+                                  className={`${draggingCategoryId === cat.id ? "opacity-60" : "opacity-100"} cursor-grab active:cursor-grabbing`}
+                                >
+                                  <CategorySection
+                                    category={cat}
+                                    displayName={displayName}
+                                    statusFilter={statusFilter}
+                                    onReorderMods={handleReorderMods}
+                                    onUpdateCategory={(id, name) =>
+                                      updateCategory(id, name, selectedCar.id)
+                                    }
+                                    onDeleteCategory={(id) =>
+                                      deleteCategory(id, selectedCar.id)
+                                    }
+                                    onAddMod={(
+                                      mod: Omit<
+                                        Mod,
+                                        "id" | "created_at" | "display_order"
+                                      >,
+                                    ) => addMod(mod, selectedCar.id)}
+                                    onUpdateMod={(id, updates) =>
+                                      updateMod(id, updates, selectedCar.id)
+                                    }
+                                    onDeleteMod={(id) =>
+                                      deleteMod(id, selectedCar.id)
+                                    }
+                                  />
+                                </div>
                               );
                             })}
                           </div>

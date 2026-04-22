@@ -7,8 +7,6 @@ import {
   Trash2,
   X,
   Check,
-  ArrowUp,
-  ArrowDown,
 } from "lucide-react";
 import type { CategoryWithMods, Mod } from "../types/database";
 import { ModItem } from "./ModItem";
@@ -18,13 +16,14 @@ interface Props {
   category: CategoryWithMods;
   displayName?: string;
   statusFilter?: string[];
-  canMoveUp: boolean;
-  canMoveDown: boolean;
-  onMoveUp: (id: string) => void;
-  onMoveDown: (id: string) => void;
+  onReorderMods: (
+    categoryId: string,
+    draggedId: string,
+    targetId: string,
+  ) => void;
   onUpdateCategory: (id: string, name: string) => void;
   onDeleteCategory: (id: string) => void;
-  onAddMod: (mod: Omit<Mod, "id" | "created_at">) => void;
+  onAddMod: (mod: Omit<Mod, "id" | "created_at" | "display_order">) => void;
   onUpdateMod: (id: string, updates: Partial<Mod>) => void;
   onDeleteMod: (id: string) => void;
 }
@@ -55,10 +54,7 @@ export function CategorySection({
   category,
   displayName,
   statusFilter = ["planned", "onHand", "installed"],
-  canMoveUp,
-  canMoveDown,
-  onMoveUp,
-  onMoveDown,
+  onReorderMods,
   onUpdateCategory,
   onDeleteCategory,
   onAddMod,
@@ -69,6 +65,7 @@ export function CategorySection({
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(category.name);
   const [addingMod, setAddingMod] = useState(false);
+  const [draggingModId, setDraggingModId] = useState<string | null>(null);
   const [form, setForm] = useState<AddModForm>({
     name: "",
     priceMin: "",
@@ -95,6 +92,10 @@ export function CategorySection({
   const sortedMods = [...category.mods]
     .filter((mod) => statusFilter.includes(mod.status ?? "planned"))
     .sort((a, b) => {
+      const orderA = a.display_order ?? Number.MAX_SAFE_INTEGER;
+      const orderB = b.display_order ?? Number.MAX_SAFE_INTEGER;
+      if (orderA !== orderB) return orderA - orderB;
+
       const aIndex = statusOrder.indexOf(a.status ?? "planned");
       const bIndex = statusOrder.indexOf(b.status ?? "planned");
       return aIndex - bIndex;
@@ -172,28 +173,6 @@ export function CategorySection({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onMoveUp(category.id);
-                }}
-                className="text-gray-600 hover:text-gray-300 transition-colors p-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
-                disabled={!canMoveUp}
-                aria-label="Move category up"
-              >
-                <ArrowUp size={12} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMoveDown(category.id);
-                }}
-                className="text-gray-600 hover:text-gray-300 transition-colors p-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
-                disabled={!canMoveDown}
-                aria-label="Move category down"
-              >
-                <ArrowDown size={12} />
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
                   setEditingName(true);
                 }}
                 className="text-gray-600 hover:text-gray-400 transition-colors p-0.5"
@@ -227,12 +206,26 @@ export function CategorySection({
             </p>
           )}
           {sortedMods.map((mod) => (
-            <ModItem
+            <div
               key={mod.id}
-              mod={mod}
-              onUpdate={onUpdateMod}
-              onDelete={onDeleteMod}
-            />
+              draggable
+              onDragStart={() => setDraggingModId(mod.id)}
+              onDragEnd={() => setDraggingModId(null)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (draggingModId && draggingModId !== mod.id) {
+                  onReorderMods(category.id, draggingModId, mod.id);
+                }
+              }}
+              className={`${draggingModId === mod.id ? "opacity-60" : "opacity-100"} cursor-grab active:cursor-grabbing`}
+            >
+              <ModItem
+                mod={mod}
+                onUpdate={onUpdateMod}
+                onDelete={onDeleteMod}
+              />
+            </div>
           ))}
 
           {addingMod && (

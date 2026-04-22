@@ -78,6 +78,12 @@ function isCarOrderColumnMissingError(message: string): boolean {
   );
 }
 
+function isModOrderColumnMissingError(message: string): boolean {
+  return /display_order.*column|column.*display_order|schema cache/i.test(
+    message,
+  );
+}
+
 function makeStatusNote(status: ModStatus): string {
   const title = status.charAt(0).toUpperCase() + status.slice(1);
   return `Status: ${title}`;
@@ -88,9 +94,9 @@ function appendStatusNote(notes: string | null, status: ModStatus): string {
   const statusNote = makeStatusNote(status);
 
   if (!existingNotes) return statusNote;
-  if (/^status:\s*(planned|bought|installed)\b/im.test(existingNotes)) {
+  if (/^status:\s*(planned|bought|onHand|installed)\b/im.test(existingNotes)) {
     return existingNotes.replace(
-      /(^|\n)\s*status:\s*(planned|bought|installed)\b.*?(?=\n|$)/gi,
+      /(^|\n)\s*status:\s*(planned|bought|onHand|installed)\b.*?(?=\n|$)/gi,
       `$1${statusNote}`,
     );
   }
@@ -275,14 +281,30 @@ export function useCarBuild() {
         return;
       }
 
-      const { data: modsData, error: modsError } = await client
+      let { data: modsData, error: modsError } = await client
         .from("mods")
         .select("*")
         .in(
           "category_id",
           (categories || []).map((c) => c.id),
         )
+        .order("display_order", { ascending: true })
         .order("created_at", { ascending: true });
+
+      if (modsError && isModOrderColumnMissingError(modsError.message)) {
+        const fallbackMods = await client
+          .from("mods")
+          .select("*")
+          .in(
+            "category_id",
+            (categories || []).map((c) => c.id),
+          )
+          .order("created_at", { ascending: true });
+
+        modsData = fallbackMods.data;
+        modsError = fallbackMods.error;
+      }
+
       if (modsError) {
         setError(modsError.message);
         return;
@@ -434,36 +456,16 @@ export function useCarBuild() {
     [fetchCars, fetchCarDetails, getClient],
   );
 
-  const moveCarInList = useCallback(
-    async (
-      orderedCarIds: string[],
-      carId: string,
-      direction: "up" | "down",
-    ) => {
+  const reorderCarsInList = useCallback(
+    async (orderedCarIds: string[]) => {
       const client = getClient();
       if (!client) return;
 
-      const currentIndex = orderedCarIds.findIndex((id) => id === carId);
-      if (currentIndex === -1) return;
-
-      const targetIndex =
-        direction === "up" ? currentIndex - 1 : currentIndex + 1;
-      if (targetIndex < 0 || targetIndex >= orderedCarIds.length) return;
-
-      const currentCar = cars.find((c) => c.id === carId);
-      const targetCar = cars.find((c) => c.id === orderedCarIds[targetIndex]);
-      if (!currentCar || !targetCar) return;
-
-      const updates = [
-        { id: currentCar.id, display_order: targetCar.display_order },
-        { id: targetCar.id, display_order: currentCar.display_order },
-      ];
-
-      for (const update of updates) {
+      for (let index = 0; index < orderedCarIds.length; index += 1) {
         const { error } = await client
           .from("cars")
-          .update({ display_order: update.display_order })
-          .eq("id", update.id);
+          .update({ display_order: index + 1 })
+          .eq("id", orderedCarIds[index]);
 
         if (error) {
           if (isCarOrderColumnMissingError(error.message)) {
@@ -480,7 +482,80 @@ export function useCarBuild() {
 
       await fetchCars();
     },
-    [cars, fetchCars, getClient],
+    [fetchCars, getClient],
+  );
+
+  const moveCarInList = useCallback(
+    async (
+      orderedCarIds: string[],
+      carId: string,
+      direction: "up" | "down",
+    ) => {
+      const currentIndex = orderedCarIds.findIndex((id) => id === carId);
+      if (currentIndex === -1) return;
+
+      const targetIndex =
+        direction === "up" ? currentIndex - 1 : currentIndex + 1;
+      if (targetIndex < 0 || targetIndex >= orderedCarIds.length) return;
+
+      const reordered = [...orderedCarIds];
+      const [moved] = reordered.splice(currentIndex, 1);
+      reordered.splice(targetIndex, 0, moved);
+
+      await reorderCarsInList(reordered);
+    },
+    [reorderCarsInList],
+  );
+
+  const reorderCategoriesInList = useCallback(
+    async (carId: string, orderedCategoryIds: string[]) => {
+      const client = getClient();
+      if (!client) return;
+
+      for (let index = 0; index < orderedCategoryIds.length; index += 1) {
+        const { error } = await client
+          .from("mod_categories")
+          .update({ display_order: index + 1 })
+          .eq("id", orderedCategoryIds[index]);
+
+        if (error) {
+          setError(error.message);
+          return;
+        }
+      }
+
+      await fetchCarDetails(carId);
+    },
+    [fetchCarDetails, getClient],
+  );
+
+  const reorderModsInCategory = useCallback(
+    async (carId: string, orderedModIds: string[]) => {
+      const client = getClient();
+      if (!client) return;
+
+      for (let index = 0; index < orderedModIds.length; index += 1) {
+        const { error } = await client
+          .from("mods")
+          .update({ display_order: index + 1 })
+          .eq("id", orderedModIds[index]);
+
+        if (error) {
+          if (isModOrderColumnMissingError(error.message)) {
+            setError(
+              "Mod drag-and-drop needs the latest migration. Run migrations and try again.",
+            );
+            return;
+          }
+
+          setError(error.message);
+          return;
+        }
+      }
+
+      await fetchCarDetails(carId);
+    },
+    [fetchCarDetails, getClient],
   );
 
   const addCategory = useCallback(
@@ -600,10 +675,11 @@ export function useCarBuild() {
         }
 
         if (category.mods.length > 0) {
-          const { error: modsError } = await client.from("mods").insert(
-            category.mods.map((mod) => ({
+          let { error: modsError } = await client.from("mods").insert(
+            category.mods.map((mod, modIndex) => ({
               category_id: insertedCategory.id,
               name: mod.name,
+              display_order: modIndex + 1,
               price_min: mod.price_min,
               price_max: mod.price_max,
               url: mod.url,
@@ -611,6 +687,22 @@ export function useCarBuild() {
               notes: mod.notes,
             })),
           );
+
+          if (modsError && isModOrderColumnMissingError(modsError.message)) {
+            const fallbackMods = await client.from("mods").insert(
+              category.mods.map((mod) => ({
+                category_id: insertedCategory.id,
+                name: mod.name,
+                price_min: mod.price_min,
+                price_max: mod.price_max,
+                url: mod.url,
+                status: mod.status,
+                notes: mod.notes,
+              })),
+            );
+
+            modsError = fallbackMods.error;
+          }
 
           if (modsError) {
             setError(modsError.message);
@@ -807,48 +899,50 @@ export function useCarBuild() {
         direction === "up" ? currentIndex - 1 : currentIndex + 1;
       if (targetIndex < 0 || targetIndex >= orderedCategoryIds.length) return;
 
-      const currentCategory = selectedCar.categories.find(
-        (c) => c.id === categoryId,
-      );
-      const targetCategory = selectedCar.categories.find(
-        (c) => c.id === orderedCategoryIds[targetIndex],
-      );
+      const reordered = [...orderedCategoryIds];
+      const [moved] = reordered.splice(currentIndex, 1);
+      reordered.splice(targetIndex, 0, moved);
 
-      if (!currentCategory || !targetCategory) return;
-
-      const updates = [
-        { id: currentCategory.id, display_order: targetCategory.display_order },
-        { id: targetCategory.id, display_order: currentCategory.display_order },
-      ];
-
-      for (const update of updates) {
-        const { error } = await client
-          .from("mod_categories")
-          .update({ display_order: update.display_order })
-          .eq("id", update.id);
-
-        if (error) {
-          setError(error.message);
-          return;
-        }
-      }
-
-      await fetchCarDetails(carId);
+      await reorderCategoriesInList(carId, reordered);
     },
-    [fetchCarDetails, getClient, selectedCar],
+    [getClient, reorderCategoriesInList, selectedCar],
   );
 
   const addMod = useCallback(
-    async (mod: Omit<Mod, "id" | "created_at">, carId: string) => {
+    async (
+      mod: Omit<Mod, "id" | "created_at" | "display_order">,
+      carId: string,
+    ) => {
       const client = getClient();
       if (!client) return;
 
       const normalizedMod = {
         ...mod,
+        display_order:
+          (selectedCar?.categories
+            .find((c) => c.id === mod.category_id)
+            ?.mods.reduce(
+              (m, item) => Math.max(m, item.display_order ?? 0),
+              0,
+            ) ?? 0) + 1,
         status: normalizeModStatus(mod.status, mod.notes ?? null),
       };
 
       let { error } = await client.from("mods").insert(normalizedMod);
+      if (error && isModOrderColumnMissingError(error.message)) {
+        const fallbackInsert = await client.from("mods").insert({
+          category_id: normalizedMod.category_id,
+          name: normalizedMod.name,
+          price_min: normalizedMod.price_min,
+          price_max: normalizedMod.price_max,
+          url: normalizedMod.url,
+          status: normalizedMod.status,
+          notes: normalizedMod.notes,
+        });
+
+        error = fallbackInsert.error;
+      }
+
       if (error && isStatusColumnMissingError(error.message)) {
         const fallbackMod = {
           ...normalizedMod,
@@ -873,7 +967,7 @@ export function useCarBuild() {
       }
       await fetchCarDetails(carId);
     },
-    [fetchCarDetails, getClient],
+    [fetchCarDetails, getClient, selectedCar],
   );
 
   const updateMod = useCallback(
@@ -971,15 +1065,18 @@ export function useCarBuild() {
     addCar,
     updateCar,
     deleteCar,
+    reorderCarsInList,
     moveCarInList,
     addCategory,
     addPowerStage,
     importBuildFromText,
     movePowerGroup,
+    reorderCategoriesInList,
     updateCategory,
     deleteCategory,
     moveCategory,
     moveCategoryInList,
+    reorderModsInCategory,
     addMod,
     updateMod,
     deleteMod,
