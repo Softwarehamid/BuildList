@@ -67,6 +67,12 @@ export default function App() {
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
   const [importing, setImporting] = useState(false);
+  const [draggingRegularCategoryId, setDraggingRegularCategoryId] = useState<
+    string | null
+  >(null);
+  const [draggingPowerCategoryId, setDraggingPowerCategoryId] = useState<
+    string | null
+  >(null);
   const [statusFilter, setStatusFilter] = useState<string[]>([
     "planned",
     "onHand",
@@ -103,6 +109,29 @@ export default function App() {
     moveCarInList(orderedCarIds, id, direction);
   };
 
+  const reorderByDrop = (
+    orderedIds: string[],
+    draggedId: string,
+    targetId: string,
+  ) => {
+    const fromIndex = orderedIds.indexOf(draggedId);
+    const toIndex = orderedIds.indexOf(targetId);
+    if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
+      return orderedIds;
+    }
+
+    const next = [...orderedIds];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    return next;
+  };
+
+  const handleReorderCars = (draggedId: string, targetId: string) => {
+    const orderedCarIds = cars.map((car) => car.id);
+    const reordered = reorderByDrop(orderedCarIds, draggedId, targetId);
+    reorderCarsInList(reordered);
+  };
+
   const moveInOrderedSet = (
     orderedIds: string[],
     categoryId: string,
@@ -136,6 +165,69 @@ export default function App() {
     const [moved] = reordered.splice(currentIndex, 1);
     reordered.splice(targetIndex, 0, moved);
     reorderModsInCategory(selectedCar.id, reordered);
+  };
+
+  const handleReorderMods = (
+    categoryId: string,
+    draggedId: string,
+    targetId: string,
+  ) => {
+    if (!selectedCar) return;
+    const category = selectedCar.categories.find((c) => c.id === categoryId);
+    if (!category) return;
+
+    const orderedModIds = [...category.mods]
+      .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+      .map((m) => m.id);
+
+    const reordered = reorderByDrop(orderedModIds, draggedId, targetId);
+    reorderModsInCategory(selectedCar.id, reordered);
+  };
+
+  const reorderSubsetInFullOrder = (
+    fullOrder: string[],
+    subsetCurrentOrder: string[],
+    subsetReordered: string[],
+  ) => {
+    const subsetSet = new Set(subsetCurrentOrder);
+    let idx = 0;
+    return fullOrder.map((id) => {
+      if (!subsetSet.has(id)) return id;
+      const next = subsetReordered[idx];
+      idx += 1;
+      return next;
+    });
+  };
+
+  const handleReorderRegularCategories = (
+    draggedId: string,
+    targetId: string,
+  ) => {
+    if (!selectedCar) return;
+
+    const reorderedRegular = reorderByDrop(regularIds, draggedId, targetId);
+    const fullOrder = orderedCategories.map((c) => c.id);
+    const reorderedFull = reorderSubsetInFullOrder(
+      fullOrder,
+      regularIds,
+      reorderedRegular,
+    );
+
+    reorderCategoriesInList(selectedCar.id, reorderedFull);
+  };
+
+  const handleReorderPowerStages = (draggedId: string, targetId: string) => {
+    if (!selectedCar) return;
+
+    const reorderedPower = reorderByDrop(powerStageIds, draggedId, targetId);
+    const fullOrder = orderedCategories.map((c) => c.id);
+    const reorderedFull = reorderSubsetInFullOrder(
+      fullOrder,
+      powerStageIds,
+      reorderedPower,
+    );
+
+    reorderCategoriesInList(selectedCar.id, reorderedFull);
   };
 
   const orderedCategories = selectedCar
@@ -222,6 +314,7 @@ export default function App() {
             onSelect={selectCar}
             onAddCar={handleAddCar}
             onMoveCar={moveCar}
+            onReorderCars={handleReorderCars}
             onDeleteCar={deleteCar}
           />
 
@@ -294,38 +387,61 @@ export default function App() {
                       if (!cat) return null;
 
                       return (
-                        <CategorySection
+                        <div
                           key={cat.id}
-                          category={cat}
-                          statusFilter={statusFilter}
-                          canMoveUp={currentRegularIndex > 0}
-                          canMoveDown={
-                            currentRegularIndex < regularIds.length - 1
+                          draggable
+                          onDragStart={() =>
+                            setDraggingRegularCategoryId(cat.id)
                           }
-                          onMoveUp={(id) =>
-                            moveInOrderedSet(regularIds, id, "up")
-                          }
-                          onMoveDown={(id) =>
-                            moveInOrderedSet(regularIds, id, "down")
-                          }
-                          onMoveMod={moveModInCategory}
-                          onUpdateCategory={(id, name) =>
-                            updateCategory(id, name, selectedCar.id)
-                          }
-                          onDeleteCategory={(id) =>
-                            deleteCategory(id, selectedCar.id)
-                          }
-                          onAddMod={(
-                            mod: Omit<
-                              Mod,
-                              "id" | "created_at" | "display_order"
-                            >,
-                          ) => addMod(mod, selectedCar.id)}
-                          onUpdateMod={(id, updates) =>
-                            updateMod(id, updates, selectedCar.id)
-                          }
-                          onDeleteMod={(id) => deleteMod(id, selectedCar.id)}
-                        />
+                          onDragEnd={() => setDraggingRegularCategoryId(null)}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            if (
+                              draggingRegularCategoryId &&
+                              draggingRegularCategoryId !== cat.id
+                            ) {
+                              handleReorderRegularCategories(
+                                draggingRegularCategoryId,
+                                cat.id,
+                              );
+                            }
+                          }}
+                          className={`${draggingRegularCategoryId === cat.id ? "opacity-60" : "opacity-100"} cursor-grab active:cursor-grabbing`}
+                        >
+                          <CategorySection
+                            category={cat}
+                            statusFilter={statusFilter}
+                            canMoveUp={currentRegularIndex > 0}
+                            canMoveDown={
+                              currentRegularIndex < regularIds.length - 1
+                            }
+                            onMoveUp={(id) =>
+                              moveInOrderedSet(regularIds, id, "up")
+                            }
+                            onMoveDown={(id) =>
+                              moveInOrderedSet(regularIds, id, "down")
+                            }
+                            onMoveMod={moveModInCategory}
+                            onReorderMods={handleReorderMods}
+                            onUpdateCategory={(id, name) =>
+                              updateCategory(id, name, selectedCar.id)
+                            }
+                            onDeleteCategory={(id) =>
+                              deleteCategory(id, selectedCar.id)
+                            }
+                            onAddMod={(
+                              mod: Omit<
+                                Mod,
+                                "id" | "created_at" | "display_order"
+                              >,
+                            ) => addMod(mod, selectedCar.id)}
+                            onUpdateMod={(id, updates) =>
+                              updateMod(id, updates, selectedCar.id)
+                            }
+                            onDeleteMod={(id) => deleteMod(id, selectedCar.id)}
+                          />
+                        </div>
                       );
                     }
 
@@ -406,39 +522,68 @@ export default function App() {
                                 ? `Stage ${stageNumber}`
                                 : cat.name;
                               return (
-                                <CategorySection
+                                <div
                                   key={cat.id}
-                                  category={cat}
-                                  displayName={displayName}
-                                  statusFilter={statusFilter}
-                                  canMoveUp={index > 0}
-                                  canMoveDown={index < powerStages.length - 1}
-                                  onMoveUp={(id) =>
-                                    moveInOrderedSet(powerStageIds, id, "up")
+                                  draggable
+                                  onDragStart={() =>
+                                    setDraggingPowerCategoryId(cat.id)
                                   }
-                                  onMoveDown={(id) =>
-                                    moveInOrderedSet(powerStageIds, id, "down")
+                                  onDragEnd={() =>
+                                    setDraggingPowerCategoryId(null)
                                   }
-                                  onMoveMod={moveModInCategory}
-                                  onUpdateCategory={(id, name) =>
-                                    updateCategory(id, name, selectedCar.id)
-                                  }
-                                  onDeleteCategory={(id) =>
-                                    deleteCategory(id, selectedCar.id)
-                                  }
-                                  onAddMod={(
-                                    mod: Omit<
-                                      Mod,
-                                      "id" | "created_at" | "display_order"
-                                    >,
-                                  ) => addMod(mod, selectedCar.id)}
-                                  onUpdateMod={(id, updates) =>
-                                    updateMod(id, updates, selectedCar.id)
-                                  }
-                                  onDeleteMod={(id) =>
-                                    deleteMod(id, selectedCar.id)
-                                  }
-                                />
+                                  onDragOver={(e) => e.preventDefault()}
+                                  onDrop={(e) => {
+                                    e.preventDefault();
+                                    if (
+                                      draggingPowerCategoryId &&
+                                      draggingPowerCategoryId !== cat.id
+                                    ) {
+                                      handleReorderPowerStages(
+                                        draggingPowerCategoryId,
+                                        cat.id,
+                                      );
+                                    }
+                                  }}
+                                  className={`${draggingPowerCategoryId === cat.id ? "opacity-60" : "opacity-100"} cursor-grab active:cursor-grabbing`}
+                                >
+                                  <CategorySection
+                                    category={cat}
+                                    displayName={displayName}
+                                    statusFilter={statusFilter}
+                                    canMoveUp={index > 0}
+                                    canMoveDown={index < powerStages.length - 1}
+                                    onMoveUp={(id) =>
+                                      moveInOrderedSet(powerStageIds, id, "up")
+                                    }
+                                    onMoveDown={(id) =>
+                                      moveInOrderedSet(
+                                        powerStageIds,
+                                        id,
+                                        "down",
+                                      )
+                                    }
+                                    onMoveMod={moveModInCategory}
+                                    onReorderMods={handleReorderMods}
+                                    onUpdateCategory={(id, name) =>
+                                      updateCategory(id, name, selectedCar.id)
+                                    }
+                                    onDeleteCategory={(id) =>
+                                      deleteCategory(id, selectedCar.id)
+                                    }
+                                    onAddMod={(
+                                      mod: Omit<
+                                        Mod,
+                                        "id" | "created_at" | "display_order"
+                                      >,
+                                    ) => addMod(mod, selectedCar.id)}
+                                    onUpdateMod={(id, updates) =>
+                                      updateMod(id, updates, selectedCar.id)
+                                    }
+                                    onDeleteMod={(id) =>
+                                      deleteMod(id, selectedCar.id)
+                                    }
+                                  />
+                                </div>
                               );
                             })}
                           </div>

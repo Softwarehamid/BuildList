@@ -27,6 +27,11 @@ interface Props {
     modId: string,
     direction: "up" | "down",
   ) => void;
+  onReorderMods: (
+    categoryId: string,
+    draggedId: string,
+    targetId: string,
+  ) => void;
   onUpdateCategory: (id: string, name: string) => void;
   onDeleteCategory: (id: string) => void;
   onAddMod: (mod: Omit<Mod, "id" | "created_at" | "display_order">) => void;
@@ -65,6 +70,7 @@ export function CategorySection({
   onMoveUp,
   onMoveDown,
   onMoveMod,
+  onReorderMods,
   onUpdateCategory,
   onDeleteCategory,
   onAddMod,
@@ -75,6 +81,7 @@ export function CategorySection({
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(category.name);
   const [addingMod, setAddingMod] = useState(false);
+  const [draggingModId, setDraggingModId] = useState<string | null>(null);
   const [form, setForm] = useState<AddModForm>({
     name: "",
     priceMin: "",
@@ -237,7 +244,20 @@ export function CategorySection({
             </p>
           )}
           {sortedMods.map((mod, index) => (
-            <div key={mod.id} className="flex items-center gap-1">
+            <div
+              key={mod.id}
+              draggable
+              onDragStart={() => setDraggingModId(mod.id)}
+              onDragEnd={() => setDraggingModId(null)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (draggingModId && draggingModId !== mod.id) {
+                  onReorderMods(category.id, draggingModId, mod.id);
+                }
+              }}
+              className={`flex items-center gap-1 cursor-grab active:cursor-grabbing ${draggingModId === mod.id ? "opacity-60" : "opacity-100"}`}
+            >
               <div className="flex flex-col gap-0.5">
                 <button
                   onClick={() => onMoveMod(category.id, mod.id, "up")}

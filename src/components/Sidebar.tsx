@@ -24,6 +24,7 @@ interface Props {
     down_payment: number | null;
   }) => void;
   onMoveCar: (id: string, direction: "up" | "down") => void;
+  onReorderCars: (draggedId: string, targetId: string) => void;
   onDeleteCar: (id: string) => void;
 }
 
@@ -34,9 +35,11 @@ export function Sidebar({
   onSelect,
   onAddCar,
   onMoveCar,
+  onReorderCars,
   onDeleteCar,
 }: Props) {
   const [adding, setAdding] = useState(false);
+  const [draggingCarId, setDraggingCarId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     basePrice: "",
@@ -85,7 +88,17 @@ export function Sidebar({
             return (
               <div
                 key={car.id}
-                className={`group flex flex-col gap-1.5 px-3 py-2.5 cursor-pointer transition-colors ${selectedCarId === car.id ? "bg-red-950/30" : "hover:bg-white/[0.03]"}`}
+                draggable
+                onDragStart={() => setDraggingCarId(car.id)}
+                onDragEnd={() => setDraggingCarId(null)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (draggingCarId && draggingCarId !== car.id) {
+                    onReorderCars(draggingCarId, car.id);
+                  }
+                }}
+                className={`group flex flex-col gap-1.5 px-3 py-2.5 cursor-grab active:cursor-grabbing transition-colors ${selectedCarId === car.id ? "bg-red-950/30" : "hover:bg-white/[0.03]"} ${draggingCarId === car.id ? "opacity-60" : "opacity-100"}`}
                 onClick={() => onSelect(car.id)}
               >
                 <div className="flex items-center gap-2">
