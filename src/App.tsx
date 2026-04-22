@@ -226,6 +226,12 @@ export default function App() {
           />
 
           <main className="flex-1 min-w-0 space-y-4">
+            {error && (
+              <div className="rounded-lg border border-amber-900/60 bg-amber-950/20 px-3 py-2">
+                <p className="text-xs text-amber-300">{error}</p>
+              </div>
+            )}
+
             {loading && !selectedCar ? (
               <div className="flex items-center gap-3 text-gray-500 py-10 justify-center">
                 <Loader2 size={18} className="animate-spin" />

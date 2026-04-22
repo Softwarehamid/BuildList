@@ -215,6 +215,8 @@ export function useCarBuild() {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [supportsCarDisplayOrder, setSupportsCarDisplayOrder] = useState(true);
+  const [supportsModDisplayOrder, setSupportsModDisplayOrder] = useState(true);
 
   const getClient = useCallback(() => {
     if (!isSupabaseConfigured || !supabase) {
@@ -228,13 +230,31 @@ export function useCarBuild() {
     const client = getClient();
     if (!client) return;
 
-    let { data, error } = await client
-      .from("cars")
-      .select("*")
-      .order("display_order", { ascending: true })
-      .order("created_at", { ascending: true });
+    let data: Car[] | null = null;
+    let error: { message: string } | null = null;
 
-    if (error && isCarOrderColumnMissingError(error.message)) {
+    if (supportsCarDisplayOrder) {
+      const primaryResult = await client
+        .from("cars")
+        .select("*")
+        .order("display_order", { ascending: true })
+        .order("created_at", { ascending: true });
+
+      data = primaryResult.data;
+      error = primaryResult.error;
+
+      if (error && isCarOrderColumnMissingError(error.message)) {
+        setSupportsCarDisplayOrder(false);
+
+        const fallbackResult = await client
+          .from("cars")
+          .select("*")
+          .order("created_at", { ascending: true });
+
+        data = fallbackResult.data;
+        error = fallbackResult.error;
+      }
+    } else {
       const fallbackResult = await client
         .from("cars")
         .select("*")
@@ -250,7 +270,7 @@ export function useCarBuild() {
     }
     setCars(data || []);
     return data;
-  }, [getClient]);
+  }, [getClient, supportsCarDisplayOrder]);
 
   function getPowerStageNumber(name: string): number | null {
     const stageMatch = name.match(/^stage\b\D*(\d+)/i);
@@ -281,17 +301,39 @@ export function useCarBuild() {
         return;
       }
 
-      let { data: modsData, error: modsError } = await client
-        .from("mods")
-        .select("*")
-        .in(
-          "category_id",
-          (categories || []).map((c) => c.id),
-        )
-        .order("display_order", { ascending: true })
-        .order("created_at", { ascending: true });
+      let modsData: Mod[] | null = null;
+      let modsError: { message: string } | null = null;
 
-      if (modsError && isModOrderColumnMissingError(modsError.message)) {
+      if (supportsModDisplayOrder) {
+        const primaryMods = await client
+          .from("mods")
+          .select("*")
+          .in(
+            "category_id",
+            (categories || []).map((c) => c.id),
+          )
+          .order("display_order", { ascending: true })
+          .order("created_at", { ascending: true });
+
+        modsData = primaryMods.data;
+        modsError = primaryMods.error;
+
+        if (modsError && isModOrderColumnMissingError(modsError.message)) {
+          setSupportsModDisplayOrder(false);
+
+          const fallbackMods = await client
+            .from("mods")
+            .select("*")
+            .in(
+              "category_id",
+              (categories || []).map((c) => c.id),
+            )
+            .order("created_at", { ascending: true });
+
+          modsData = fallbackMods.data;
+          modsError = fallbackMods.error;
+        }
+      } else {
         const fallbackMods = await client
           .from("mods")
           .select("*")
@@ -338,7 +380,7 @@ export function useCarBuild() {
 
       setSelectedCar({ ...car, categories: categoriesWithMods });
     },
-    [getClient],
+    [getClient, supportsModDisplayOrder],
   );
 
   const loadAll = useCallback(async () => {
@@ -385,11 +427,16 @@ export function useCarBuild() {
         0,
       );
 
-      const insertPayload = {
-        ...car,
-        image_url: null,
-        display_order: maxOrder + 1,
-      };
+      const insertPayload = supportsCarDisplayOrder
+        ? {
+            ...car,
+            image_url: null,
+            display_order: maxOrder + 1,
+          }
+        : {
+            ...car,
+            image_url: null,
+          };
 
       let { data, error } = await client
         .from("cars")
@@ -398,6 +445,7 @@ export function useCarBuild() {
         .maybeSingle();
 
       if (error && isCarOrderColumnMissingError(error.message)) {
+        setSupportsCarDisplayOrder(false);
         const fallbackResult = await client
           .from("cars")
           .insert({ ...car, image_url: null })
@@ -415,7 +463,7 @@ export function useCarBuild() {
       await fetchCars();
       return data;
     },
-    [cars, fetchCars, getClient],
+    [cars, fetchCars, getClient, supportsCarDisplayOrder],
   );
 
   const updateCar = useCallback(
@@ -461,6 +509,13 @@ export function useCarBuild() {
       const client = getClient();
       if (!client) return;
 
+      if (!supportsCarDisplayOrder) {
+        setError(
+          "Car ordering is unavailable until the latest database migration is applied.",
+        );
+        return;
+      }
+
       for (let index = 0; index < orderedCarIds.length; index += 1) {
         const { error } = await client
           .from("cars")
@@ -469,6 +524,7 @@ export function useCarBuild() {
 
         if (error) {
           if (isCarOrderColumnMissingError(error.message)) {
+            setSupportsCarDisplayOrder(false);
             setError(
               "Car reordering needs the latest migration. Run migrations and try again.",
             );
@@ -482,7 +538,7 @@ export function useCarBuild() {
 
       await fetchCars();
     },
-    [fetchCars, getClient],
+    [fetchCars, getClient, supportsCarDisplayOrder],
   );
 
   const moveCarInList = useCallback(
@@ -534,6 +590,13 @@ export function useCarBuild() {
       const client = getClient();
       if (!client) return;
 
+      if (!supportsModDisplayOrder) {
+        setError(
+          "Mod ordering is unavailable until the latest database migration is applied.",
+        );
+        return;
+      }
+
       for (let index = 0; index < orderedModIds.length; index += 1) {
         const { error } = await client
           .from("mods")
@@ -542,8 +605,9 @@ export function useCarBuild() {
 
         if (error) {
           if (isModOrderColumnMissingError(error.message)) {
+            setSupportsModDisplayOrder(false);
             setError(
-              "Mod drag-and-drop needs the latest migration. Run migrations and try again.",
+              "Mod ordering needs the latest migration. Run migrations and try again.",
             );
             return;
           }
@@ -555,7 +619,7 @@ export function useCarBuild() {
 
       await fetchCarDetails(carId);
     },
-    [fetchCarDetails, getClient],
+    [fetchCarDetails, getClient, supportsModDisplayOrder],
   );
 
   const addCategory = useCallback(
@@ -675,20 +739,26 @@ export function useCarBuild() {
         }
 
         if (category.mods.length > 0) {
-          let { error: modsError } = await client.from("mods").insert(
+          const buildModInsertRows = () =>
             category.mods.map((mod, modIndex) => ({
               category_id: insertedCategory.id,
               name: mod.name,
-              display_order: modIndex + 1,
+              ...(supportsModDisplayOrder
+                ? { display_order: modIndex + 1 }
+                : {}),
               price_min: mod.price_min,
               price_max: mod.price_max,
               url: mod.url,
               status: mod.status,
               notes: mod.notes,
-            })),
-          );
+            }));
+
+          let { error: modsError } = await client
+            .from("mods")
+            .insert(buildModInsertRows());
 
           if (modsError && isModOrderColumnMissingError(modsError.message)) {
+            setSupportsModDisplayOrder(false);
             const fallbackMods = await client.from("mods").insert(
               category.mods.map((mod) => ({
                 category_id: insertedCategory.id,
@@ -715,7 +785,7 @@ export function useCarBuild() {
       await fetchCarDetails(newCar.id);
       return newCar.id;
     },
-    [fetchCarDetails, fetchCars, getClient],
+    [fetchCarDetails, fetchCars, getClient, supportsModDisplayOrder],
   );
 
   const movePowerGroup = useCallback(
@@ -918,18 +988,23 @@ export function useCarBuild() {
 
       const normalizedMod = {
         ...mod,
-        display_order:
-          (selectedCar?.categories
-            .find((c) => c.id === mod.category_id)
-            ?.mods.reduce(
-              (m, item) => Math.max(m, item.display_order ?? 0),
-              0,
-            ) ?? 0) + 1,
+        ...(supportsModDisplayOrder
+          ? {
+              display_order:
+                (selectedCar?.categories
+                  .find((c) => c.id === mod.category_id)
+                  ?.mods.reduce(
+                    (m, item) => Math.max(m, item.display_order ?? 0),
+                    0,
+                  ) ?? 0) + 1,
+            }
+          : {}),
         status: normalizeModStatus(mod.status, mod.notes ?? null),
       };
 
       let { error } = await client.from("mods").insert(normalizedMod);
       if (error && isModOrderColumnMissingError(error.message)) {
+        setSupportsModDisplayOrder(false);
         const fallbackInsert = await client.from("mods").insert({
           category_id: normalizedMod.category_id,
           name: normalizedMod.name,
@@ -967,7 +1042,7 @@ export function useCarBuild() {
       }
       await fetchCarDetails(carId);
     },
-    [fetchCarDetails, getClient, selectedCar],
+    [fetchCarDetails, getClient, selectedCar, supportsModDisplayOrder],
   );
 
   const updateMod = useCallback(
