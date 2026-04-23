@@ -216,12 +216,15 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
   };
 
   return (
-    <div className="group flex items-center justify-between gap-3 py-2.5 px-3 rounded-lg border border-transparent hover:border-[#2a2a2a] hover:bg-[#181818] hover:shadow-[0_6px_24px_rgba(0,0,0,0.22)] hover:-translate-y-[1px] transition-all">
-      <div className="flex items-start gap-3 min-w-0">
-        <div className="w-1 h-1 rounded-full bg-gray-600 flex-shrink-0" />
-        <span className="text-gray-200 text-sm truncate block">{mod.name}</span>
+    <div className="group py-2.5 px-3 rounded-lg border border-transparent hover:border-[#2a2a2a] hover:bg-[#181818] hover:shadow-[0_6px_24px_rgba(0,0,0,0.22)] hover:-translate-y-[1px] transition-all">
+      <div className="flex items-start gap-2 min-w-0">
+        <div className="w-1 h-1 rounded-full bg-gray-600 flex-shrink-0 mt-1.5" />
+        <span className="text-gray-200 text-sm leading-5 break-words min-w-0 flex-1">
+          {mod.name}
+        </span>
       </div>
-      <div className="flex items-center gap-2 flex-shrink-0">
+
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <button
           onClick={cycleStatus}
           className={`w-12 text-[10px] uppercase tracking-wide font-semibold text-center px-1.5 py-1 rounded-full border transition-all active:scale-95 ${getStatusClasses(mod.status ?? "planned")}`}
@@ -229,16 +232,19 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
         >
           {getStatusIndicator(mod.status ?? "planned")}
         </button>
+
         {modTag && (
           <span className={getTagBadge(modTag)} title={`Tagged: ${modTag}`}>
             #{modTag}
           </span>
         )}
+
         <span
-          className={`text-sm font-medium tabular-nums ${mod.price_min === null && mod.price_max === null ? "text-gray-500 italic" : isRange ? "text-amber-400" : "text-green-400"}`}
+          className={`text-sm font-medium tabular-nums break-all ${mod.price_min === null && mod.price_max === null ? "text-gray-500 italic" : isRange ? "text-amber-400" : "text-green-400"}`}
         >
           {formatPrice(mod.price_min, mod.price_max)}
         </span>
+
         {mod.url && (
           <a
             href={mod.url}
@@ -250,7 +256,8 @@ export function ModItem({ mod, onUpdate, onDelete }: Props) {
             <ExternalLink size={13} />
           </a>
         )}
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+
+        <div className="ml-auto flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
           <button
             onClick={() => setEditing(true)}
             className="text-gray-600 hover:text-gray-300 transition-colors p-0.5"
