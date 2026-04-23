@@ -348,7 +348,7 @@ export default function App() {
       )}
 
       <div className="max-w-6xl mx-auto px-4 py-6 md:py-10">
-        <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start">
+        <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-stretch md:items-start">
           <div className="md:hidden w-full">
             <button
               onClick={() => setMobileBuildsOpen(true)}
@@ -376,7 +376,7 @@ export default function App() {
             />
           </div>
 
-          <main className="flex-1 min-w-0 space-y-4">
+          <main className="w-full max-w-full flex-1 min-w-0 space-y-4">
             {error && (
               <div className="rounded-lg border border-amber-900/60 bg-amber-950/20 px-3 py-2">
                 <p className="text-xs text-amber-300">{error}</p>
@@ -396,7 +396,7 @@ export default function App() {
                 />
 
                 {/* Quick Filters */}
-                <div className="flex items-center gap-2 px-0.5">
+                <div className="flex flex-wrap items-center gap-2 px-0.5">
                   <span className="text-[10px] uppercase tracking-widest text-gray-600 font-semibold">
                     Filter:
                   </span>
