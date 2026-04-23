@@ -4,10 +4,12 @@ import {
   Loader2,
   ChevronDown,
   ChevronRight,
+  Menu,
   Zap,
   ArrowUp,
   ArrowDown,
   FileText,
+  X,
 } from "lucide-react";
 import { useCarBuild } from "./hooks/useCarBuild";
 import { Sidebar } from "./components/Sidebar";
@@ -67,6 +69,7 @@ export default function App() {
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
   const [importing, setImporting] = useState(false);
+  const [mobileBuildsOpen, setMobileBuildsOpen] = useState(false);
   const [draggingRegularCategoryId, setDraggingRegularCategoryId] = useState<
     string | null
   >(null);
@@ -87,6 +90,11 @@ export default function App() {
   }) => {
     const newCar = await addCar(car);
     if (newCar) selectCar(newCar.id);
+  };
+
+  const handleSelectCar = (carId: string) => {
+    selectCar(carId);
+    setMobileBuildsOpen(false);
   };
 
   const handleAddCategory = async () => {
@@ -304,19 +312,69 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#080808] pt-[env(safe-area-inset-top)] text-white">
+    <div className="min-h-screen bg-[#080808] pt-[env(safe-area-inset-top)] text-white overflow-x-hidden">
+      {mobileBuildsOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <button
+            className="absolute inset-0 bg-black/60"
+            aria-label="Close builds menu"
+            onClick={() => setMobileBuildsOpen(false)}
+          />
+          <div className="absolute left-0 top-0 h-full w-[88vw] max-w-sm border-r border-[#1e1e1e] bg-[#080808] p-4 overflow-y-auto">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs uppercase tracking-[0.2em] text-gray-500 font-semibold">
+                My Builds
+              </span>
+              <button
+                onClick={() => setMobileBuildsOpen(false)}
+                className="text-gray-500 hover:text-white transition-colors p-1"
+                aria-label="Close menu"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <Sidebar
+              cars={cars}
+              selectedCar={selectedCar}
+              selectedCarId={selectedCar?.id}
+              onSelect={handleSelectCar}
+              onAddCar={handleAddCar}
+              onMoveCar={moveCar}
+              onReorderCars={handleReorderCars}
+              onDeleteCar={deleteCar}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto px-4 py-6 md:py-10">
         <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-start">
-          <Sidebar
-            cars={cars}
-            selectedCar={selectedCar}
-            selectedCarId={selectedCar?.id}
-            onSelect={selectCar}
-            onAddCar={handleAddCar}
-            onMoveCar={moveCar}
-            onReorderCars={handleReorderCars}
-            onDeleteCar={deleteCar}
-          />
+          <div className="md:hidden w-full">
+            <button
+              onClick={() => setMobileBuildsOpen(true)}
+              className="w-full flex items-center justify-between rounded-xl border border-[#1e1e1e] bg-[#111111] px-3 py-2.5"
+            >
+              <span className="flex items-center gap-2 text-sm text-gray-200">
+                <Menu size={15} className="text-red-400" /> My Builds
+              </span>
+              <span className="text-xs text-gray-500 truncate max-w-[55vw]">
+                {selectedCar?.name ?? "No build selected"}
+              </span>
+            </button>
+          </div>
+
+          <div className="hidden md:block md:w-64 md:flex-shrink-0">
+            <Sidebar
+              cars={cars}
+              selectedCar={selectedCar}
+              selectedCarId={selectedCar?.id}
+              onSelect={handleSelectCar}
+              onAddCar={handleAddCar}
+              onMoveCar={moveCar}
+              onReorderCars={handleReorderCars}
+              onDeleteCar={deleteCar}
+            />
+          </div>
 
           <main className="flex-1 min-w-0 space-y-4">
             {error && (
