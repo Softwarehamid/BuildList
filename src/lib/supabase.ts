@@ -13,3 +13,28 @@ export const supabaseConfigError = isSupabaseConfigured
 export const supabase = isSupabaseConfigured
   ? createClient<Database>(supabaseUrl, supabaseAnonKey)
   : null;
+
+export async function getCurrentUser() {
+  if (!supabase) return null;
+
+  const { data, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  return data.user;
+}
+
+export async function claimLegacyBuildsForCurrentUser() {
+  if (!supabase) {
+    throw new Error(supabaseConfigError ?? "Supabase is not configured.");
+  }
+
+  const { data, error } = await supabase.rpc("claim_my_legacy_builds");
+  if (error) throw error;
+
+  const claimedRow = Array.isArray(data) ? data[0] : null;
+  const claimed =
+    claimedRow && typeof claimedRow.claimed_cars === "number"
+      ? claimedRow.claimed_cars
+      : 0;
+
+  return claimed;
+}

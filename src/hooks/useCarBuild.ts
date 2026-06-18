@@ -106,7 +106,7 @@ function appendStatusNote(notes: string | null, status: ModStatus): string {
 
 function extractDollarValues(text: string): number[] {
   return Array.from(text.matchAll(/\$\s*([\d,]+(?:\.\d{1,2})?)/g))
-    .map((match) => Number.parseFloat(match[1].replaceAll(",", "")))
+    .map((match) => Number.parseFloat(match[1].replace(/,/g, "")))
     .filter((value) => Number.isFinite(value));
 }
 
@@ -208,7 +208,7 @@ function parseBuildImport(rawText: string): ParsedImportBuild {
   };
 }
 
-export function useCarBuild() {
+export function useCarBuild(requireAuth = false) {
   const [cars, setCars] = useState<Car[]>([]);
   const [selectedCar, setSelectedCar] = useState<CarWithCategories | null>(
     null,
@@ -392,12 +392,30 @@ export function useCarBuild() {
       return;
     }
 
+    if (requireAuth && supabase) {
+      const { data: authData, error: authError } =
+        await supabase.auth.getUser();
+      if (authError) {
+        setError(authError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (!authData.user) {
+        setCars([]);
+        setSelectedCar(null);
+        setError(null);
+        setLoading(false);
+        return;
+      }
+    }
+
     const data = await fetchCars();
     if (data && data.length > 0) {
       await fetchCarDetails(data[0].id);
     }
     setLoading(false);
-  }, [fetchCars, fetchCarDetails]);
+  }, [fetchCars, fetchCarDetails, requireAuth]);
 
   useEffect(() => {
     loadAll();

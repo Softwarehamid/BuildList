@@ -73,3 +73,17 @@ Open the app at `http://localhost:5173`.
 
 - This project is currently designed as a personal tracker without authentication.
 - If you plan to deploy publicly, tighten RLS policies and add auth.
+
+## Migrating Existing Builds To Your User Account
+
+If you already have builds saved before auth was added, use this flow:
+
+1. Run migration `supabase/migrations/20260618120500_add_user_ownership_and_claim_legacy_builds.sql`.
+2. Sign in to your account in the app.
+3. Run this RPC once (SQL Editor or app call):
+
+```sql
+select * from public.claim_my_legacy_builds();
+```
+
+That claim operation assigns all legacy unowned car rows to your signed-in user. Because categories and mods are linked to cars, all related data (order, status, links, notes, prices) is preserved automatically.

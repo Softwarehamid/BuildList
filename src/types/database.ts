@@ -3,7 +3,9 @@ export interface Database {
     Tables: {
       cars: {
         Row: Car;
-        Insert: Omit<Car, "id" | "created_at">;
+        Insert: Omit<Car, "id" | "created_at" | "user_id"> & {
+          user_id?: string | null;
+        };
         Update: Partial<Omit<Car, "id" | "created_at">>;
       };
       mod_categories: {
@@ -24,6 +26,7 @@ export interface Database {
 
 export interface Car {
   id: string;
+  user_id: string | null;
   name: string;
   display_order: number;
   base_price: number | null;

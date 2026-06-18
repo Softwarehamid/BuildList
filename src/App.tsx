@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import type { User } from "@supabase/supabase-js";
 import {
   Plus,
   Loader2,
@@ -9,14 +10,23 @@ import {
   ArrowUp,
   ArrowDown,
   FileText,
+  LogOut,
   X,
 } from "lucide-react";
 import { useCarBuild } from "./hooks/useCarBuild";
 import { Sidebar } from "./components/Sidebar";
 import { CarHeader } from "./components/CarHeader";
 import { CategorySection } from "./components/CategorySection";
+import {
+  isSupabaseConfigured,
+  supabase,
+  supabaseConfigError,
+} from "./lib/supabase";
 import type { Mod } from "./types/database";
 import { formatPrice } from "./lib/utils";
+
+const AUTH_APP_SOURCE = "buildlist-web";
+const AUTH_APP_NAME = "BuildList";
 
 function isPowerStageCategory(name: string): boolean {
   return /^stage\b/i.test(name) || /^power\s*-\s*stage\b/i.test(name);
@@ -62,7 +72,15 @@ export default function App() {
     addMod,
     updateMod,
     deleteMod,
-  } = useCarBuild();
+  } = useCarBuild(true);
+
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [authMode, setAuthMode] = useState<"signIn" | "signUp">("signIn");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const [addingCategory, setAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -83,6 +101,117 @@ export default function App() {
     "onHand",
     "installed",
   ]);
+
+  useEffect(() => {
+    const client = supabase;
+
+    if (!isSupabaseConfigured || !client) {
+      setAuthError(supabaseConfigError ?? "Supabase is not configured.");
+      setAuthReady(true);
+      return;
+    }
+
+    let isActive = true;
+
+    const bootAuth = async () => {
+      const { data, error } = await client.auth.getUser();
+      if (!isActive) return;
+
+      if (error) {
+        setAuthError(error.message);
+      } else {
+        setAuthUser(data.user ?? null);
+      }
+
+      setAuthReady(true);
+    };
+
+    void bootAuth();
+
+    const {
+      data: { subscription },
+    } = client.auth.onAuthStateChange((_event, session) => {
+      setAuthUser(session?.user ?? null);
+      setAuthError(null);
+      setAuthReady(true);
+    });
+
+    return () => {
+      isActive = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const client = supabase;
+    if (!client || !authUser) return;
+
+    const meta = (authUser.user_metadata ?? {}) as Record<string, unknown>;
+    const hasAppSource =
+      typeof meta.app_source === "string" && meta.app_source.length > 0;
+
+    if (hasAppSource) return;
+
+    void client.auth.updateUser({
+      data: {
+        ...meta,
+        app_source: AUTH_APP_SOURCE,
+        app_name: AUTH_APP_NAME,
+      },
+    });
+  }, [authUser]);
+
+  const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const client = supabase;
+    if (!client) return;
+
+    setAuthSubmitting(true);
+    setAuthError(null);
+
+    if (authMode === "signIn") {
+      const { error } = await client.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        setAuthError(error.message);
+      }
+    } else {
+      const { error } = await client.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            app_source: AUTH_APP_SOURCE,
+            app_name: AUTH_APP_NAME,
+          },
+        },
+      });
+
+      if (error) {
+        setAuthError(error.message);
+      } else {
+        setAuthError(
+          "Account created. If email confirmation is enabled, verify your email then sign in.",
+        );
+        setAuthMode("signIn");
+      }
+    }
+
+    setAuthSubmitting(false);
+  };
+
+  const handleSignOut = async () => {
+    const client = supabase;
+    if (!client) return;
+
+    const { error: signOutError } = await client.auth.signOut();
+    if (signOutError) {
+      setAuthError(signOutError.message);
+    }
+  };
 
   const handleAddCar = async (car: {
     name: string;
@@ -379,6 +508,97 @@ export default function App() {
     powerBlockIndex !== -1 &&
     powerBlockIndex < orderedBlocks.length - 1;
 
+  if (!authReady) {
+    return (
+      <div className="min-h-screen bg-[#080808] pt-[env(safe-area-inset-top)] flex items-center justify-center">
+        <div className="flex items-center gap-3 text-gray-500">
+          <Loader2 size={18} className="animate-spin" />
+          <span className="text-sm">Checking session...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authUser) {
+    return (
+      <div className="min-h-screen bg-[#080808] pt-[env(safe-area-inset-top)] text-white flex items-center justify-center px-4">
+        <div className="w-full max-w-md rounded-2xl border border-[#1e1e1e] bg-[#111111] p-6 space-y-5">
+          <div>
+            <p className="text-[10px] uppercase tracking-widest text-red-500 font-semibold">
+              BuildList Account
+            </p>
+            <h1 className="text-xl font-bold mt-1">
+              Sign in to load your builds
+            </h1>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 rounded-lg border border-[#1f1f1f] bg-[#0d0d0d] p-1">
+            <button
+              onClick={() => setAuthMode("signIn")}
+              className={`rounded-md py-2 text-sm font-semibold transition-colors ${
+                authMode === "signIn"
+                  ? "bg-[#1a1a1a] text-white"
+                  : "text-gray-500 hover:text-gray-300"
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              onClick={() => setAuthMode("signUp")}
+              className={`rounded-md py-2 text-sm font-semibold transition-colors ${
+                authMode === "signUp"
+                  ? "bg-[#1a1a1a] text-white"
+                  : "text-gray-500 hover:text-gray-300"
+              }`}
+            >
+              Create Account
+            </button>
+          </div>
+
+          <form className="space-y-3" onSubmit={handleAuthSubmit}>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
+              className="w-full bg-[#0b0b0b] border border-[#292929] rounded-md px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-red-700"
+              autoComplete="email"
+              required
+            />
+
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              className="w-full bg-[#0b0b0b] border border-[#292929] rounded-md px-3 py-2 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-red-700"
+              autoComplete={
+                authMode === "signIn" ? "current-password" : "new-password"
+              }
+              required
+              minLength={6}
+            />
+
+            <button
+              type="submit"
+              disabled={authSubmitting}
+              className="w-full flex items-center justify-center gap-2 rounded-md bg-red-700 hover:bg-red-600 disabled:opacity-60 disabled:cursor-not-allowed transition-colors py-2.5 text-sm font-semibold"
+            >
+              {authSubmitting && <Loader2 size={14} className="animate-spin" />}
+              {authMode === "signIn" ? "Sign In" : "Create Account"}
+            </button>
+          </form>
+
+          {authError && (
+            <div className="rounded-md border border-amber-900/50 bg-amber-950/20 px-3 py-2">
+              <p className="text-xs text-amber-300">{authError}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (loading && cars.length === 0) {
     return (
       <div className="min-h-screen bg-[#080808] pt-[env(safe-area-inset-top)] flex items-center justify-center">
@@ -438,6 +658,18 @@ export default function App() {
       )}
 
       <div className="max-w-6xl mx-auto px-4 py-6 md:py-10">
+        <div className="mb-4 flex items-center justify-end gap-3">
+          <span className="text-xs text-gray-500 truncate max-w-[60vw]">
+            {authUser.email}
+          </span>
+          <button
+            onClick={handleSignOut}
+            className="inline-flex items-center gap-1.5 rounded-md border border-[#2a2a2a] bg-[#111111] px-3 py-1.5 text-xs font-semibold text-gray-300 hover:text-white hover:border-[#444] transition-colors"
+          >
+            <LogOut size={12} /> Sign Out
+          </button>
+        </div>
+
         <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-stretch md:items-start">
           <div className="md:hidden w-full">
             <button
