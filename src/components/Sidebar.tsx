@@ -4,6 +4,7 @@ import {
   Car,
   Trash2,
   ChevronRight,
+  GripVertical,
   X,
   Check,
   Gauge,
@@ -88,9 +89,6 @@ export function Sidebar({
             return (
               <div
                 key={car.id}
-                draggable
-                onDragStart={() => setDraggingCarId(car.id)}
-                onDragEnd={() => setDraggingCarId(null)}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -98,10 +96,25 @@ export function Sidebar({
                     onReorderCars(draggingCarId, car.id);
                   }
                 }}
-                className={`group flex flex-col gap-1.5 px-3 py-2.5 cursor-grab active:cursor-grabbing transition-colors ${selectedCarId === car.id ? "bg-red-950/30" : "hover:bg-white/[0.03]"} ${draggingCarId === car.id ? "opacity-60" : "opacity-100"}`}
+                className={`group flex flex-col gap-1.5 px-3 py-2.5 transition-colors ${selectedCarId === car.id ? "bg-red-950/30" : "hover:bg-white/[0.03]"} ${draggingCarId === car.id ? "opacity-60" : "opacity-100"}`}
                 onClick={() => onSelect(car.id)}
               >
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    draggable
+                    onClick={(e) => e.stopPropagation()}
+                    onDragStart={(e) => {
+                      e.dataTransfer.effectAllowed = "move";
+                      setDraggingCarId(car.id);
+                    }}
+                    onDragEnd={() => setDraggingCarId(null)}
+                    className="text-gray-600 hover:text-gray-300 transition-colors p-0.5 cursor-grab active:cursor-grabbing"
+                    aria-label="Drag build to reorder"
+                    title="Drag to reorder"
+                  >
+                    <GripVertical size={12} />
+                  </button>
                   <Car
                     size={13}
                     className={

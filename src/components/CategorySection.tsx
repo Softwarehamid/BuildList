@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
+  GripVertical,
   Plus,
   Pencil,
   Trash2,
@@ -20,6 +21,9 @@ interface Props {
   statusFilter?: string[];
   canMoveUp: boolean;
   canMoveDown: boolean;
+  dragging?: boolean;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
   onMoveUp: (id: string) => void;
   onMoveDown: (id: string) => void;
   onMoveMod: (
@@ -67,6 +71,9 @@ export function CategorySection({
   statusFilter = ["planned", "onHand", "installed"],
   canMoveUp,
   canMoveDown,
+  dragging = false,
+  onDragStart,
+  onDragEnd,
   onMoveUp,
   onMoveDown,
   onMoveMod,
@@ -140,9 +147,26 @@ export function CategorySection({
   return (
     <div className="bg-[#111111] border border-[#1e1e1e] rounded-xl overflow-hidden">
       <div
-        className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-white/[0.02] transition-colors select-none"
+        className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
         onClick={() => setOpen((o) => !o)}
       >
+        {onDragStart && (
+          <button
+            type="button"
+            draggable
+            onClick={(e) => e.stopPropagation()}
+            onDragStart={(e) => {
+              e.dataTransfer.effectAllowed = "move";
+              onDragStart();
+            }}
+            onDragEnd={onDragEnd}
+            className={`text-gray-600 hover:text-gray-300 transition-colors p-0.5 -ml-1 cursor-grab active:cursor-grabbing ${dragging ? "opacity-100" : "opacity-70"}`}
+            aria-label="Drag category to reorder"
+            title="Drag to reorder"
+          >
+            <GripVertical size={14} />
+          </button>
+        )}
         <div
           className="w-[3px] h-5 rounded-full flex-shrink-0"
           style={{ backgroundColor: color }}

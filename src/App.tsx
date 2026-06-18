@@ -16,6 +16,7 @@ import { Sidebar } from "./components/Sidebar";
 import { CarHeader } from "./components/CarHeader";
 import { CategorySection } from "./components/CategorySection";
 import type { Mod } from "./types/database";
+import { formatPrice } from "./lib/utils";
 
 function isPowerStageCategory(name: string): boolean {
   return /^stage\b/i.test(name) || /^power\s*-\s*stage\b/i.test(name);
@@ -76,6 +77,7 @@ export default function App() {
   const [draggingPowerCategoryId, setDraggingPowerCategoryId] = useState<
     string | null
   >(null);
+  const [copiedBuildText, setCopiedBuildText] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string[]>([
     "planned",
     "onHand",
@@ -110,6 +112,94 @@ export default function App() {
     setImporting(true);
     await importBuildFromText(importText);
     setImporting(false);
+  };
+
+  const copySelectedBuildText = async () => {
+    if (!selectedCar) return;
+
+    const orderedMods = (mods: Mod[]) =>
+      [...mods].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+
+    const statusLabel: Record<Mod["status"], string> = {
+      planned: "Planned",
+      onHand: "On Hand",
+      installed: "Installed",
+    };
+
+    const buildValue = (value: number | null) =>
+      value === null
+        ? "TBD"
+        : value.toLocaleString("en-US", {
+            style: "currency",
+            currency: "USD",
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+          });
+
+    const lines: string[] = [selectedCar.name, ""];
+
+    const priceRows = [
+      ["Base Price", selectedCar.base_price],
+      ["Out-the-Door", selectedCar.out_the_door_price],
+      ["Down Payment", selectedCar.down_payment],
+    ].filter(([, value]) => value !== null) as Array<[string, number | null]>;
+
+    if (priceRows.length > 0) {
+      lines.push("Prices:");
+      for (const [label, value] of priceRows) {
+        lines.push(`- ${label}: ${buildValue(value)}`);
+      }
+      lines.push("");
+    }
+
+    const appendCategory = (
+      category: (typeof orderedCategories)[number],
+      indent = "",
+    ) => {
+      lines.push(`${indent}${category.name}:`);
+
+      const mods = orderedMods(category.mods);
+      if (mods.length === 0) {
+        lines.push(`${indent}  - No parts yet`);
+        lines.push("");
+        return;
+      }
+
+      for (const mod of mods) {
+        const priceText = formatPrice(mod.price_min, mod.price_max);
+        const status = statusLabel[mod.status ?? "planned"];
+        lines.push(
+          priceText === "TBD"
+            ? `${indent}  - ${mod.name} [${status}]`
+            : `${indent}  - ${mod.name} [${status}] - ${priceText}`,
+        );
+      }
+
+      lines.push("");
+    };
+
+    for (const block of orderedBlocks) {
+      if (block.type === "regular") {
+        const category = regularById.get(block.categoryId);
+        if (category) appendCategory(category);
+        continue;
+      }
+
+      lines.push("Power:");
+      if (powerStages.length === 0) {
+        lines.push("  - No stages yet");
+        lines.push("");
+        continue;
+      }
+
+      for (const stage of powerStages) {
+        appendCategory(stage, "  ");
+      }
+    }
+
+    await navigator.clipboard.writeText(lines.join("\n").trim());
+    setCopiedBuildText(true);
+    window.setTimeout(() => setCopiedBuildText(false), 1500);
   };
 
   const moveCar = (id: string, direction: "up" | "down") => {
@@ -396,43 +486,52 @@ export default function App() {
                 />
 
                 {/* Quick Filters */}
-                <div className="flex flex-wrap items-center gap-2 px-0.5">
-                  <span className="text-[10px] uppercase tracking-widest text-gray-600 font-semibold">
-                    Filter:
-                  </span>
-                  {["planned", "onHand", "installed"].map((status) => {
-                    const labels: Record<string, string> = {
-                      planned: "Planned",
-                      onHand: "On Hand",
-                      installed: "Installed",
-                    };
-                    const colors: Record<string, string> = {
-                      planned: statusFilter.includes(status)
-                        ? "border-sky-500 bg-sky-900/30 text-sky-300"
-                        : "border-sky-900/50 bg-sky-900/10 text-sky-500/50",
-                      onHand: statusFilter.includes(status)
-                        ? "border-amber-500 bg-amber-900/30 text-amber-300"
-                        : "border-amber-900/50 bg-amber-900/10 text-amber-500/50",
-                      installed: statusFilter.includes(status)
-                        ? "border-emerald-500 bg-emerald-900/30 text-emerald-300"
-                        : "border-emerald-900/50 bg-emerald-900/10 text-emerald-500/50",
-                    };
-                    return (
-                      <button
-                        key={status}
-                        onClick={() =>
-                          setStatusFilter((f) =>
-                            f.includes(status)
-                              ? f.filter((s) => s !== status)
-                              : [...f, status],
-                          )
-                        }
-                        className={`text-xs font-semibold px-2.5 py-1.5 rounded-md border transition-all ${colors[status]}`}
-                      >
-                        {labels[status as keyof typeof labels]}
-                      </button>
-                    );
-                  })}
+                <div className="flex flex-wrap items-center justify-between gap-3 px-0.5">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] uppercase tracking-widest text-gray-600 font-semibold">
+                      Filter:
+                    </span>
+                    {["planned", "onHand", "installed"].map((status) => {
+                      const labels: Record<string, string> = {
+                        planned: "Planned",
+                        onHand: "On Hand",
+                        installed: "Installed",
+                      };
+                      const colors: Record<string, string> = {
+                        planned: statusFilter.includes(status)
+                          ? "border-sky-500 bg-sky-900/30 text-sky-300"
+                          : "border-sky-900/50 bg-sky-900/10 text-sky-500/50",
+                        onHand: statusFilter.includes(status)
+                          ? "border-amber-500 bg-amber-900/30 text-amber-300"
+                          : "border-amber-900/50 bg-amber-900/10 text-amber-500/50",
+                        installed: statusFilter.includes(status)
+                          ? "border-emerald-500 bg-emerald-900/30 text-emerald-300"
+                          : "border-emerald-900/50 bg-emerald-900/10 text-emerald-500/50",
+                      };
+                      return (
+                        <button
+                          key={status}
+                          onClick={() =>
+                            setStatusFilter((f) =>
+                              f.includes(status)
+                                ? f.filter((s) => s !== status)
+                                : [...f, status],
+                            )
+                          }
+                          className={`text-xs font-semibold px-2.5 py-1.5 rounded-md border transition-all ${colors[status]}`}
+                        >
+                          {labels[status as keyof typeof labels]}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    onClick={copySelectedBuildText}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md border border-[#2a2a2a] bg-[#111111] text-gray-300 hover:text-white hover:border-[#444] transition-colors"
+                  >
+                    {copiedBuildText ? "Copied" : "Copy Build"}
+                  </button>
                 </div>
 
                 <div className="space-y-3 pt-2">
@@ -447,11 +546,6 @@ export default function App() {
                       return (
                         <div
                           key={cat.id}
-                          draggable
-                          onDragStart={() =>
-                            setDraggingRegularCategoryId(cat.id)
-                          }
-                          onDragEnd={() => setDraggingRegularCategoryId(null)}
                           onDragOver={(e) => e.preventDefault()}
                           onDrop={(e) => {
                             e.preventDefault();
@@ -465,7 +559,7 @@ export default function App() {
                               );
                             }
                           }}
-                          className={`${draggingRegularCategoryId === cat.id ? "opacity-60" : "opacity-100"} cursor-grab active:cursor-grabbing`}
+                          className={`${draggingRegularCategoryId === cat.id ? "opacity-60" : "opacity-100"}`}
                         >
                           <CategorySection
                             category={cat}
@@ -474,6 +568,11 @@ export default function App() {
                             canMoveDown={
                               currentRegularIndex < regularIds.length - 1
                             }
+                            dragging={draggingRegularCategoryId === cat.id}
+                            onDragStart={() =>
+                              setDraggingRegularCategoryId(cat.id)
+                            }
+                            onDragEnd={() => setDraggingRegularCategoryId(null)}
                             onMoveUp={(id) =>
                               moveInOrderedSet(regularIds, id, "up")
                             }
@@ -582,13 +681,6 @@ export default function App() {
                               return (
                                 <div
                                   key={cat.id}
-                                  draggable
-                                  onDragStart={() =>
-                                    setDraggingPowerCategoryId(cat.id)
-                                  }
-                                  onDragEnd={() =>
-                                    setDraggingPowerCategoryId(null)
-                                  }
                                   onDragOver={(e) => e.preventDefault()}
                                   onDrop={(e) => {
                                     e.preventDefault();
@@ -602,7 +694,7 @@ export default function App() {
                                       );
                                     }
                                   }}
-                                  className={`${draggingPowerCategoryId === cat.id ? "opacity-60" : "opacity-100"} cursor-grab active:cursor-grabbing`}
+                                  className={`${draggingPowerCategoryId === cat.id ? "opacity-60" : "opacity-100"}`}
                                 >
                                   <CategorySection
                                     category={cat}
@@ -610,6 +702,15 @@ export default function App() {
                                     statusFilter={statusFilter}
                                     canMoveUp={index > 0}
                                     canMoveDown={index < powerStages.length - 1}
+                                    dragging={
+                                      draggingPowerCategoryId === cat.id
+                                    }
+                                    onDragStart={() =>
+                                      setDraggingPowerCategoryId(cat.id)
+                                    }
+                                    onDragEnd={() =>
+                                      setDraggingPowerCategoryId(null)
+                                    }
                                     onMoveUp={(id) =>
                                       moveInOrderedSet(powerStageIds, id, "up")
                                     }
