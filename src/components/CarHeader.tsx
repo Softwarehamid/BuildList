@@ -87,6 +87,79 @@ function PriceField({
   );
 }
 
+function TextField({
+  label,
+  value,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string | null;
+  placeholder: string;
+  onChange: (v: string | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [input, setInput] = useState(value ?? "");
+
+  const save = () => {
+    const next = input.trim();
+    onChange(next.length > 0 ? next : null);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <div className="flex flex-col gap-1">
+        <span className="text-[10px] uppercase tracking-widest text-gray-500 font-medium">
+          {label}
+        </span>
+        <div className="flex items-center gap-1">
+          <input
+            className="bg-transparent border-b border-red-600 text-white text-lg font-bold w-40 focus:outline-none"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            type="text"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") save();
+              if (e.key === "Escape") setEditing(false);
+            }}
+          />
+          <button onClick={save} className="text-green-500 ml-1">
+            <Check size={13} />
+          </button>
+          <button onClick={() => setEditing(false)} className="text-gray-500">
+            <X size={13} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex flex-col gap-1 cursor-pointer group"
+      onClick={() => {
+        setInput(value ?? "");
+        setEditing(true);
+      }}
+    >
+      <span className="text-[10px] uppercase tracking-widest text-gray-500 font-medium">
+        {label}
+      </span>
+      <div className="flex items-center gap-1.5">
+        <span className="text-white text-lg font-bold truncate max-w-[11rem]">
+          {value || placeholder}
+        </span>
+        <Pencil
+          size={11}
+          className="text-gray-700 group-hover:text-gray-400 transition-colors"
+        />
+      </div>
+    </div>
+  );
+}
+
 export function CarHeader({ car, onUpdate }: Props) {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(car.name);
@@ -231,21 +304,17 @@ export function CarHeader({ car, onUpdate }: Props) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mt-6 pt-6 border-t border-[#1a1a1a]">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 pt-6 border-t border-[#1a1a1a]">
           <PriceField
             label="Base Price"
             value={car.base_price}
             onChange={(v) => onUpdate({ base_price: v })}
           />
-          <PriceField
-            label="Out-the-Door"
-            value={car.out_the_door_price}
-            onChange={(v) => onUpdate({ out_the_door_price: v })}
-          />
-          <PriceField
-            label="Down Payment"
-            value={car.down_payment}
-            onChange={(v) => onUpdate({ down_payment: v })}
+          <TextField
+            label="Car Nickname"
+            value={car.car_nickname}
+            placeholder="Set a nickname"
+            onChange={(v) => onUpdate({ car_nickname: v })}
           />
         </div>
 

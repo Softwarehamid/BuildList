@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   supabase,
   isSupabaseConfigured,
@@ -208,11 +208,19 @@ function parseBuildImport(rawText: string): ParsedImportBuild {
   };
 }
 
-export function useCarBuild(requireAuth = false) {
+interface UseCarBuildOptions {
+  requireAuth?: boolean;
+  authReady?: boolean;
+  authUserId?: string | null;
+}
+
+export function useCarBuild(options: UseCarBuildOptions = {}) {
+  const { requireAuth = false, authReady = true, authUserId = null } = options;
   const [cars, setCars] = useState<Car[]>([]);
   const [selectedCar, setSelectedCar] = useState<CarWithCategories | null>(
     null,
   );
+  const selectedCarIdRef = useRef<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [supportsCarDisplayOrder, setSupportsCarDisplayOrder] = useState(true);
@@ -225,6 +233,10 @@ export function useCarBuild(requireAuth = false) {
     }
     return supabase;
   }, []);
+
+  useEffect(() => {
+    selectedCarIdRef.current = selectedCar?.id ?? null;
+  }, [selectedCar]);
 
   const fetchCars = useCallback(async () => {
     const client = getClient();
@@ -392,30 +404,32 @@ export function useCarBuild(requireAuth = false) {
       return;
     }
 
-    if (requireAuth && supabase) {
-      const { data: authData, error: authError } =
-        await supabase.auth.getUser();
-      if (authError) {
-        setError(authError.message);
-        setLoading(false);
-        return;
-      }
+    if (requireAuth && !authReady) {
+      setLoading(false);
+      return;
+    }
 
-      if (!authData.user) {
-        setCars([]);
-        setSelectedCar(null);
-        setError(null);
-        setLoading(false);
-        return;
-      }
+    if (requireAuth && !authUserId) {
+      setCars([]);
+      setSelectedCar(null);
+      setError(null);
+      setLoading(false);
+      return;
     }
 
     const data = await fetchCars();
     if (data && data.length > 0) {
-      await fetchCarDetails(data[0].id);
+      const preferredCarId = selectedCarIdRef.current;
+      const nextCarId =
+        preferredCarId && data.some((car) => car.id === preferredCarId)
+          ? preferredCarId
+          : data[0].id;
+      await fetchCarDetails(nextCarId);
+    } else {
+      setSelectedCar(null);
     }
     setLoading(false);
-  }, [fetchCars, fetchCarDetails, requireAuth]);
+  }, [authReady, authUserId, fetchCars, fetchCarDetails, requireAuth]);
 
   useEffect(() => {
     loadAll();
@@ -424,6 +438,7 @@ export function useCarBuild(requireAuth = false) {
   const selectCar = useCallback(
     async (carId: string) => {
       setLoading(true);
+      selectedCarIdRef.current = carId;
       await fetchCarDetails(carId);
       setLoading(false);
     },
@@ -433,9 +448,8 @@ export function useCarBuild(requireAuth = false) {
   const addCar = useCallback(
     async (car: {
       name: string;
+      car_nickname: string | null;
       base_price: number | null;
-      out_the_door_price: number | null;
-      down_payment: number | null;
     }) => {
       const client = getClient();
       if (!client) return null;
@@ -514,7 +528,12 @@ export function useCarBuild(requireAuth = false) {
       }
       const data = await fetchCars();
       if (data && data.length > 0) {
-        await fetchCarDetails(data[0].id);
+        const previousSelectionId = selectedCarIdRef.current;
+        const nextCarId =
+          previousSelectionId && previousSelectionId !== id
+            ? data.find((car) => car.id === previousSelectionId)?.id
+            : null;
+        await fetchCarDetails(nextCarId ?? data[0].id);
       } else {
         setSelectedCar(null);
       }
@@ -722,6 +741,7 @@ export function useCarBuild(requireAuth = false) {
         .from("cars")
         .insert({
           name: parsed.carName,
+          car_nickname: null,
           base_price: null,
           out_the_door_price: null,
           down_payment: null,

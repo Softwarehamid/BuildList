@@ -49,6 +49,14 @@ function isNumericStageTitle(name: string): boolean {
 }
 
 export default function App() {
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [authMode, setAuthMode] = useState<"signIn" | "signUp">("signIn");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authSubmitting, setAuthSubmitting] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+
   const {
     cars,
     selectedCar,
@@ -72,15 +80,11 @@ export default function App() {
     addMod,
     updateMod,
     deleteMod,
-  } = useCarBuild(true);
-
-  const [authUser, setAuthUser] = useState<User | null>(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [authMode, setAuthMode] = useState<"signIn" | "signUp">("signIn");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [authSubmitting, setAuthSubmitting] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
+  } = useCarBuild({
+    requireAuth: true,
+    authReady,
+    authUserId: authUser?.id ?? null,
+  });
 
   const [addingCategory, setAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -114,13 +118,23 @@ export default function App() {
     let isActive = true;
 
     const bootAuth = async () => {
-      const { data, error } = await client.auth.getUser();
+      const { data, error } = await client.auth.getSession();
       if (!isActive) return;
 
       if (error) {
-        setAuthError(error.message);
+        if (
+          /auth session missing|invalid refresh token|refresh token/i.test(
+            error.message,
+          )
+        ) {
+          setAuthUser(null);
+          setAuthError(null);
+        } else {
+          setAuthError(error.message);
+        }
       } else {
-        setAuthUser(data.user ?? null);
+        setAuthUser(data.session?.user ?? null);
+        setAuthError(null);
       }
 
       setAuthReady(true);
@@ -215,9 +229,8 @@ export default function App() {
 
   const handleAddCar = async (car: {
     name: string;
+    car_nickname: string | null;
     base_price: number | null;
-    out_the_door_price: number | null;
-    down_payment: number | null;
   }) => {
     const newCar = await addCar(car);
     if (newCar) selectCar(newCar.id);
@@ -267,16 +280,20 @@ export default function App() {
 
     const lines: string[] = [selectedCar.name, ""];
 
-    const priceRows = [
-      ["Base Price", selectedCar.base_price],
-      ["Out-the-Door", selectedCar.out_the_door_price],
-      ["Down Payment", selectedCar.down_payment],
-    ].filter(([, value]) => value !== null) as Array<[string, number | null]>;
+    const carInfoRows: Array<[string, string]> = [];
 
-    if (priceRows.length > 0) {
-      lines.push("Prices:");
-      for (const [label, value] of priceRows) {
-        lines.push(`- ${label}: ${buildValue(value)}`);
+    if (selectedCar.car_nickname) {
+      carInfoRows.push(["Car Nickname", selectedCar.car_nickname]);
+    }
+
+    if (selectedCar.base_price !== null) {
+      carInfoRows.push(["Base Price", buildValue(selectedCar.base_price)]);
+    }
+
+    if (carInfoRows.length > 0) {
+      lines.push("Car Info:");
+      for (const [label, value] of carInfoRows) {
+        lines.push(`- ${label}: ${value}`);
       }
       lines.push("");
     }

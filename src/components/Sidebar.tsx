@@ -20,9 +20,8 @@ interface Props {
   onSelect: (id: string) => void;
   onAddCar: (car: {
     name: string;
+    car_nickname: string | null;
     base_price: number | null;
-    out_the_door_price: number | null;
-    down_payment: number | null;
   }) => void;
   onMoveCar: (id: string, direction: "up" | "down") => void;
   onReorderCars: (draggedId: string, targetId: string) => void;
@@ -43,9 +42,8 @@ export function Sidebar({
   const [draggingCarId, setDraggingCarId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
+    nickname: "",
     basePrice: "",
-    otd: "",
-    down: "",
   });
 
   const getCarProgress = (carId: string) => {
@@ -60,11 +58,10 @@ export function Sidebar({
     if (!form.name.trim()) return;
     onAddCar({
       name: form.name.trim(),
+      car_nickname: form.nickname.trim() || null,
       base_price: form.basePrice ? parseFloat(form.basePrice) : null,
-      out_the_door_price: form.otd ? parseFloat(form.otd) : null,
-      down_payment: form.down ? parseFloat(form.down) : null,
     });
-    setForm({ name: "", basePrice: "", otd: "", down: "" });
+    setForm({ name: "", nickname: "", basePrice: "" });
     setAdding(false);
   };
 
@@ -207,17 +204,11 @@ export function Sidebar({
           />
           <input
             className="w-full bg-[#0f0f0f] border border-[#333] text-white text-sm rounded-md px-3 py-2 focus:outline-none focus:border-red-600 placeholder-gray-600"
-            value={form.otd}
-            onChange={(e) => setForm((f) => ({ ...f, otd: e.target.value }))}
-            placeholder="Out-the-door price"
-            type="number"
-          />
-          <input
-            className="w-full bg-[#0f0f0f] border border-[#333] text-white text-sm rounded-md px-3 py-2 focus:outline-none focus:border-red-600 placeholder-gray-600"
-            value={form.down}
-            onChange={(e) => setForm((f) => ({ ...f, down: e.target.value }))}
-            placeholder="Down payment"
-            type="number"
+            value={form.nickname}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, nickname: e.target.value }))
+            }
+            placeholder="Car nickname"
           />
           <div className="flex gap-2">
             <button
