@@ -48,6 +48,7 @@ interface AddModForm {
   priceMin: string;
   priceMax: string;
   url: string;
+  notes: string;
 }
 
 const CATEGORY_COLORS: Record<string, string> = {
@@ -94,6 +95,7 @@ export function CategorySection({
     priceMin: "",
     priceMax: "",
     url: "",
+    notes: "",
   });
 
   const color = getCategoryColor(category.name);
@@ -138,9 +140,9 @@ export function CategorySection({
       price_max: form.priceMax ? parseFloat(form.priceMax) : null,
       url: form.url || null,
       status: "planned",
-      notes: null,
+      notes: form.notes.trim() || null,
     });
-    setForm({ name: "", priceMin: "", priceMax: "", url: "" });
+    setForm({ name: "", priceMin: "", priceMax: "", url: "", notes: "" });
     setAddingMod(false);
   };
 
@@ -348,6 +350,14 @@ export function CategorySection({
                   setForm((f) => ({ ...f, url: e.target.value }))
                 }
                 placeholder="Purchase URL (optional)"
+              />
+              <textarea
+                className="w-full min-h-20 bg-[#0f0f0f] border border-[#333] text-white text-sm rounded-md px-3 py-2 focus:outline-none focus:border-red-600"
+                value={form.notes}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, notes: e.target.value }))
+                }
+                placeholder="Notes (optional): supporting parts, setup details, install notes..."
               />
               <div className="flex gap-2 justify-end">
                 <button
