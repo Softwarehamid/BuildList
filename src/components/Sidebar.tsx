@@ -94,6 +94,15 @@ export function Sidebar({
     setAdding(false);
   };
 
+  const carEntries = cars.flatMap((car) => {
+    const assignedGroupIds = carGroupIds[car.id] || [];
+    const entryGroupIds =
+      allowMultipleGroups && assignedGroupIds.length > 0
+        ? assignedGroupIds
+        : [assignedGroupIds[0] || "uncategorized"];
+    return entryGroupIds.map((groupId) => ({ car, groupId }));
+  });
+
   return (
     <aside className="w-full md:w-64 flex-shrink-0 flex flex-col gap-4">
       <div className="flex items-center gap-2 px-1">
@@ -155,41 +164,47 @@ export function Sidebar({
           </div>
         )}
         <div className="divide-y divide-[#1a1a1a]">
-          {cars.map((car, index) => {
+          {carEntries.map(({ car, groupId: entryGroupId }, index) => {
             const assignedGroupIds = carGroupIds[car.id] || [];
-            const primaryGroupId = assignedGroupIds[0] || "uncategorized";
-            const group = groups.find((item) => item.id === primaryGroupId);
+            const group = groups.find((item) => item.id === entryGroupId);
             const groupName = group?.name || "Uncategorized";
             const isFirstInGroup =
-              cars.findIndex(
-                (item) =>
-                  ((carGroupIds[item.id] || [])[0] || "uncategorized") ===
-                  primaryGroupId,
+              carEntries.findIndex(
+                (entry) => entry.groupId === entryGroupId,
               ) === index;
-            if (collapsedGroups.includes(primaryGroupId)) return null;
+            if (collapsedGroups.includes(entryGroupId)) {
+              return isFirstInGroup ? (
+                <button
+                  key={`${car.id}-${entryGroupId}-collapsed`}
+                  type="button"
+                  onClick={() =>
+                    setCollapsedGroups((current) =>
+                      current.filter((id) => id !== entryGroupId),
+                    )
+                  }
+                  className="flex w-full items-center gap-2 bg-[#0d0d0d] px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-gray-500"
+                >
+                  <ChevronDown size={12} className="-rotate-90" />
+                  {groupName}
+                </button>
+              ) : null;
+            }
             const progress = getCarProgress(car.id);
             return (
-              <Fragment key={car.id}>
+              <Fragment key={`${car.id}-${entryGroupId}`}>
                 {isFirstInGroup && (
                   <button
                     type="button"
                     onClick={() =>
                       setCollapsedGroups((current) =>
-                        current.includes(primaryGroupId)
-                          ? current.filter((id) => id !== primaryGroupId)
-                          : [...current, primaryGroupId],
+                        current.includes(entryGroupId)
+                          ? current.filter((id) => id !== entryGroupId)
+                          : [...current, entryGroupId],
                       )
                     }
                     className="flex w-full items-center gap-2 bg-[#0d0d0d] px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-gray-500"
                   >
-                    <ChevronDown
-                      size={12}
-                      className={
-                        collapsedGroups.includes(primaryGroupId)
-                          ? "-rotate-90"
-                          : ""
-                      }
-                    />
+                    <ChevronDown size={12} className={""} />
                     {groupName}
                   </button>
                 )}
@@ -292,7 +307,7 @@ export function Sidebar({
                         Array.from(
                           event.target.selectedOptions,
                           (option) => option.value,
-                        ),
+                        ).filter(Boolean),
                       )
                     }
                     onClick={(event) => event.stopPropagation()}
