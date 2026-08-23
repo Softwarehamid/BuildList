@@ -60,6 +60,9 @@ export default function App() {
   const {
     cars,
     deletedCars,
+    groups,
+    carGroupIds,
+    allowMultipleGroups,
     selectedCar,
     loading,
     error,
@@ -70,6 +73,9 @@ export default function App() {
     restoreCar,
     permanentlyDeleteCar,
     duplicateCar,
+    addGroup,
+    assignCarToGroups,
+    setAllowMultipleGroups,
     moveCarInList,
     reorderCarsInList,
     addCategory,
@@ -669,6 +675,9 @@ export default function App() {
             <Sidebar
               cars={cars}
               deletedCars={deletedCars}
+              groups={groups}
+              carGroupIds={carGroupIds}
+              allowMultipleGroups={allowMultipleGroups}
               selectedCar={selectedCar}
               selectedCarId={selectedCar?.id}
               onSelect={handleSelectCar}
@@ -678,6 +687,11 @@ export default function App() {
               onDeleteCar={deleteCar}
               onRestoreCar={restoreCar}
               onPermanentlyDeleteCar={permanentlyDeleteCar}
+              onAddGroup={(name) => {
+                void addGroup(name);
+              }}
+              onAssignCarToGroups={assignCarToGroups}
+              onSetAllowMultipleGroups={setAllowMultipleGroups}
             />
           </div>
         </div>
@@ -715,6 +729,9 @@ export default function App() {
             <Sidebar
               cars={cars}
               deletedCars={deletedCars}
+              groups={groups}
+              carGroupIds={carGroupIds}
+              allowMultipleGroups={allowMultipleGroups}
               selectedCar={selectedCar}
               selectedCarId={selectedCar?.id}
               onSelect={handleSelectCar}
@@ -724,6 +741,11 @@ export default function App() {
               onDeleteCar={deleteCar}
               onRestoreCar={restoreCar}
               onPermanentlyDeleteCar={permanentlyDeleteCar}
+              onAddGroup={(name) => {
+                void addGroup(name);
+              }}
+              onAssignCarToGroups={assignCarToGroups}
+              onSetAllowMultipleGroups={setAllowMultipleGroups}
             />
           </div>
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
   Plus,
   Car,
@@ -10,12 +10,21 @@ import {
   Gauge,
   ArrowUp,
   ArrowDown,
+  ChevronDown,
+  Settings,
 } from "lucide-react";
-import type { Car as CarType, CarWithCategories } from "../types/database";
+import type {
+  Car as CarType,
+  CarGroup,
+  CarWithCategories,
+} from "../types/database";
 
 interface Props {
   cars: CarType[];
   deletedCars: CarType[];
+  groups: CarGroup[];
+  carGroupIds: Record<string, string[]>;
+  allowMultipleGroups: boolean;
   selectedCar: CarWithCategories | null;
   selectedCarId: string | undefined;
   onSelect: (id: string) => void;
@@ -29,11 +38,17 @@ interface Props {
   onDeleteCar: (id: string) => void;
   onRestoreCar: (id: string) => void;
   onPermanentlyDeleteCar: (id: string) => void;
+  onAddGroup: (name: string) => void;
+  onAssignCarToGroups: (carId: string, groupIds: string[]) => void;
+  onSetAllowMultipleGroups: (enabled: boolean) => void;
 }
 
 export function Sidebar({
   cars,
   deletedCars,
+  groups,
+  carGroupIds,
+  allowMultipleGroups,
   selectedCar,
   selectedCarId,
   onSelect,
@@ -43,11 +58,17 @@ export function Sidebar({
   onDeleteCar,
   onRestoreCar,
   onPermanentlyDeleteCar,
+  onAddGroup,
+  onAssignCarToGroups,
+  onSetAllowMultipleGroups,
 }: Props) {
   const [adding, setAdding] = useState(false);
   const [draggingCarId, setDraggingCarId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CarType | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
   const [form, setForm] = useState({
     name: "",
     nickname: "",
@@ -84,105 +105,209 @@ export function Sidebar({
 
       <div className="bg-[#111111] border border-[#1e1e1e] rounded-xl overflow-hidden">
         <div className="px-3 py-2 border-b border-[#1a1a1a]">
-          <span className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">
-            My Builds
-          </span>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">
+              My Builds
+            </span>
+            <button
+              type="button"
+              onClick={() => setSettingsOpen((open) => !open)}
+              className="text-gray-600 hover:text-white"
+              aria-label="Group settings"
+              title="Group settings"
+            >
+              <Settings size={13} />
+            </button>
+          </div>
         </div>
-        <div className="divide-y divide-[#1a1a1a]">
-          {cars.map((car, index) => {
-            const progress = getCarProgress(car.id);
-            return (
-              <div
-                key={car.id}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (draggingCarId && draggingCarId !== car.id) {
-                    onReorderCars(draggingCarId, car.id);
+        {settingsOpen && (
+          <div className="border-b border-[#1a1a1a] p-3 space-y-2">
+            <label className="flex items-center gap-2 text-xs text-gray-400">
+              <input
+                type="checkbox"
+                checked={allowMultipleGroups}
+                onChange={(event) =>
+                  onSetAllowMultipleGroups(event.target.checked)
+                }
+              />
+              Allow cars in multiple groups
+            </label>
+            <div className="flex gap-2">
+              <input
+                value={newGroupName}
+                onChange={(event) => setNewGroupName(event.target.value)}
+                placeholder="New group name"
+                className="min-w-0 flex-1 rounded-md border border-[#333] bg-[#0b0b0b] px-2 py-1.5 text-xs text-white"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (newGroupName.trim()) {
+                    onAddGroup(newGroupName);
+                    setNewGroupName("");
                   }
                 }}
-                className={`group flex flex-col gap-1.5 px-3 py-2.5 transition-colors ${selectedCarId === car.id ? "bg-red-950/30" : "hover:bg-white/[0.03]"} ${draggingCarId === car.id ? "opacity-60" : "opacity-100"}`}
-                onClick={() => onSelect(car.id)}
+                className="rounded-md bg-red-700 px-2 text-xs text-white"
               >
-                <div className="flex items-center gap-2">
+                Add
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="divide-y divide-[#1a1a1a]">
+          {cars.map((car, index) => {
+            const assignedGroupIds = carGroupIds[car.id] || [];
+            const primaryGroupId = assignedGroupIds[0] || "uncategorized";
+            const group = groups.find((item) => item.id === primaryGroupId);
+            const groupName = group?.name || "Uncategorized";
+            const isFirstInGroup =
+              cars.findIndex(
+                (item) =>
+                  ((carGroupIds[item.id] || [])[0] || "uncategorized") ===
+                  primaryGroupId,
+              ) === index;
+            if (collapsedGroups.includes(primaryGroupId)) return null;
+            const progress = getCarProgress(car.id);
+            return (
+              <Fragment key={car.id}>
+                {isFirstInGroup && (
                   <button
                     type="button"
-                    draggable
-                    onClick={(e) => e.stopPropagation()}
-                    onDragStart={(e) => {
-                      e.dataTransfer.effectAllowed = "move";
-                      setDraggingCarId(car.id);
-                    }}
-                    onDragEnd={() => setDraggingCarId(null)}
-                    className="text-gray-600 hover:text-gray-300 transition-colors p-0.5 cursor-grab active:cursor-grabbing"
-                    aria-label="Drag build to reorder"
-                    title="Drag to reorder"
-                  >
-                    <GripVertical size={12} />
-                  </button>
-                  <Car
-                    size={13}
-                    className={
-                      selectedCarId === car.id
-                        ? "text-red-400"
-                        : "text-gray-600"
+                    onClick={() =>
+                      setCollapsedGroups((current) =>
+                        current.includes(primaryGroupId)
+                          ? current.filter((id) => id !== primaryGroupId)
+                          : [...current, primaryGroupId],
+                      )
                     }
-                  />
-                  <span
-                    className={`flex-1 text-sm truncate ${selectedCarId === car.id ? "text-white font-semibold" : "text-gray-400"}`}
+                    className="flex w-full items-center gap-2 bg-[#0d0d0d] px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-gray-500"
                   >
-                    {car.name}
-                  </span>
-                  {selectedCarId === car.id && (
-                    <ChevronRight size={12} className="text-red-500" />
-                  )}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onMoveCar(car.id, "up");
-                    }}
-                    className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-gray-300 transition-all p-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
-                    disabled={index === 0}
-                    aria-label="Move build up"
-                  >
-                    <ArrowUp size={11} />
+                    <ChevronDown
+                      size={12}
+                      className={
+                        collapsedGroups.includes(primaryGroupId)
+                          ? "-rotate-90"
+                          : ""
+                      }
+                    />
+                    {groupName}
                   </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onMoveCar(car.id, "down");
-                    }}
-                    className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-gray-300 transition-all p-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
-                    disabled={index === cars.length - 1}
-                    aria-label="Move build down"
-                  >
-                    <ArrowDown size={11} />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setDeleteTarget(car);
-                      setDeleteConfirmation("");
-                    }}
-                    className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all p-0.5"
-                  >
-                    <Trash2 size={11} />
-                  </button>
-                </div>
-                {progress !== null && (
-                  <div className="flex items-center gap-2 px-0.5">
-                    <div className="flex-1 h-1 rounded-full bg-[#1a1a1a] overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-emerald-500 to-green-400"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                    <span className="text-[10px] text-gray-500 font-semibold min-w-fit">
-                      {progress}%
-                    </span>
-                  </div>
                 )}
-              </div>
+                <div
+                  key={car.id}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (draggingCarId && draggingCarId !== car.id) {
+                      onReorderCars(draggingCarId, car.id);
+                    }
+                  }}
+                  className={`group flex flex-col gap-1.5 px-3 py-2.5 transition-colors ${selectedCarId === car.id ? "bg-red-950/30" : "hover:bg-white/[0.03]"} ${draggingCarId === car.id ? "opacity-60" : "opacity-100"}`}
+                  onClick={() => onSelect(car.id)}
+                >
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      draggable
+                      onClick={(e) => e.stopPropagation()}
+                      onDragStart={(e) => {
+                        e.dataTransfer.effectAllowed = "move";
+                        setDraggingCarId(car.id);
+                      }}
+                      onDragEnd={() => setDraggingCarId(null)}
+                      className="text-gray-600 hover:text-gray-300 transition-colors p-0.5 cursor-grab active:cursor-grabbing"
+                      aria-label="Drag build to reorder"
+                      title="Drag to reorder"
+                    >
+                      <GripVertical size={12} />
+                    </button>
+                    <Car
+                      size={13}
+                      className={
+                        selectedCarId === car.id
+                          ? "text-red-400"
+                          : "text-gray-600"
+                      }
+                    />
+                    <span
+                      className={`flex-1 text-sm truncate ${selectedCarId === car.id ? "text-white font-semibold" : "text-gray-400"}`}
+                    >
+                      {car.name}
+                    </span>
+                    {selectedCarId === car.id && (
+                      <ChevronRight size={12} className="text-red-500" />
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMoveCar(car.id, "up");
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-gray-300 transition-all p-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
+                      disabled={index === 0}
+                      aria-label="Move build up"
+                    >
+                      <ArrowUp size={11} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMoveCar(car.id, "down");
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-gray-300 transition-all p-0.5 disabled:opacity-30 disabled:cursor-not-allowed"
+                      disabled={index === cars.length - 1}
+                      aria-label="Move build down"
+                    >
+                      <ArrowDown size={11} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDeleteTarget(car);
+                        setDeleteConfirmation("");
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all p-0.5"
+                    >
+                      <Trash2 size={11} />
+                    </button>
+                  </div>
+                  {progress !== null && (
+                    <div className="flex items-center gap-2 px-0.5">
+                      <div className="flex-1 h-1 rounded-full bg-[#1a1a1a] overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-emerald-500 to-green-400"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-gray-500 font-semibold min-w-fit">
+                        {progress}%
+                      </span>
+                    </div>
+                  )}
+                  <select
+                    multiple={allowMultipleGroups}
+                    value={assignedGroupIds}
+                    onChange={(event) =>
+                      onAssignCarToGroups(
+                        car.id,
+                        Array.from(
+                          event.target.selectedOptions,
+                          (option) => option.value,
+                        ),
+                      )
+                    }
+                    onClick={(event) => event.stopPropagation()}
+                    className="ml-7 max-w-[calc(100%-1.75rem)] bg-transparent text-[10px] text-gray-600 outline-none"
+                    aria-label={`Group for ${car.name}`}
+                  >
+                    <option value="">Uncategorized</option>
+                    {groups.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </Fragment>
             );
           })}
           {cars.length === 0 && (

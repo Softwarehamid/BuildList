@@ -10,6 +10,7 @@ import type {
   CategoryWithMods,
   Mod,
   ModStatus,
+  CarGroup,
 } from "../types/database";
 
 interface ParsedImportMod {
@@ -259,6 +260,11 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
   const { requireAuth = false, authReady = true, authUserId = null } = options;
   const [cars, setCars] = useState<Car[]>([]);
   const [deletedCars, setDeletedCars] = useState<Car[]>([]);
+  const [groups, setGroups] = useState<CarGroup[]>([]);
+  const [carGroupIds, setCarGroupIds] = useState<Record<string, string[]>>({});
+  const [allowMultipleGroups, setAllowMultipleGroupsState] = useState(
+    () => localStorage.getItem("buildlist.allowMultipleGroups") === "true",
+  );
   const [selectedCar, setSelectedCar] = useState<CarWithCategories | null>(
     null,
   );
@@ -360,6 +366,38 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     const current = (data || []).filter((car) => !expired.includes(car));
     setDeletedCars(current);
     return current;
+  }, [getClient]);
+
+  const fetchGroups = useCallback(async () => {
+    const client = getClient();
+    if (!client) return;
+
+    const { data: groupData, error: groupError } = await client
+      .from("car_groups")
+      .select("*")
+      .order("display_order", { ascending: true });
+    if (groupError) {
+      setError(groupError.message);
+      return;
+    }
+
+    const { data: memberData, error: memberError } = await client
+      .from("car_group_members")
+      .select("car_id, group_id");
+    if (memberError) {
+      setError(memberError.message);
+      return;
+    }
+
+    const memberships: Record<string, string[]> = {};
+    for (const member of memberData || []) {
+      memberships[member.car_id] = [
+        ...(memberships[member.car_id] || []),
+        member.group_id,
+      ];
+    }
+    setGroups(groupData || []);
+    setCarGroupIds(memberships);
   }, [getClient]);
 
   function getPowerStageNumber(name: string): number | null {
@@ -497,6 +535,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
 
     const data = await fetchCars();
     await fetchDeletedCars();
+    await fetchGroups();
     if (data && data.length > 0) {
       const preferredCarId = selectedCarIdRef.current;
       const nextCarId =
@@ -514,6 +553,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     fetchCars,
     fetchCarDetails,
     fetchDeletedCars,
+    fetchGroups,
     requireAuth,
   ]);
 
@@ -529,6 +569,66 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
       setLoading(false);
     },
     [fetchCarDetails],
+  );
+
+  const setAllowMultipleGroups = useCallback((enabled: boolean) => {
+    setAllowMultipleGroupsState(enabled);
+    localStorage.setItem("buildlist.allowMultipleGroups", String(enabled));
+  }, []);
+
+  const addGroup = useCallback(
+    async (name: string) => {
+      const client = getClient();
+      if (!client || !name.trim()) return null;
+
+      const { data, error } = await client
+        .from("car_groups")
+        .insert({ name: name.trim(), display_order: groups.length + 1 })
+        .select()
+        .maybeSingle();
+      if (error) {
+        setError(error.message);
+        return null;
+      }
+      await fetchGroups();
+      return data;
+    },
+    [fetchGroups, getClient, groups.length],
+  );
+
+  const assignCarToGroups = useCallback(
+    async (carId: string, groupIds: string[]) => {
+      const client = getClient();
+      if (!client) return;
+      const nextGroupIds = allowMultipleGroups
+        ? groupIds
+        : groupIds.slice(0, 1);
+
+      const { error: deleteError } = await client
+        .from("car_group_members")
+        .delete()
+        .eq("car_id", carId);
+      if (deleteError) {
+        setError(deleteError.message);
+        return;
+      }
+      if (nextGroupIds.length > 0) {
+        const { error: insertError } = await client
+          .from("car_group_members")
+          .insert(
+            nextGroupIds.map((groupId) => ({
+              group_id: groupId,
+              car_id: carId,
+            })),
+          );
+        if (insertError) {
+          setError(insertError.message);
+          return;
+        }
+      }
+      setCarGroupIds((current) => ({ ...current, [carId]: nextGroupIds }));
+    },
+    [allowMultipleGroups, getClient],
   );
 
   const addCar = useCallback(
@@ -1368,6 +1468,9 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
   return {
     cars,
     deletedCars,
+    groups,
+    carGroupIds,
+    allowMultipleGroups,
     selectedCar,
     loading,
     error,
@@ -1378,6 +1481,9 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     restoreCar,
     permanentlyDeleteCar,
     duplicateCar,
+    addGroup,
+    assignCarToGroups,
+    setAllowMultipleGroups,
     reorderCarsInList,
     moveCarInList,
     addCategory,
