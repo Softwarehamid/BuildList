@@ -15,7 +15,8 @@ import type { Car as CarType, CarWithCategories } from "../types/database";
 
 interface Props {
   cars: CarType[];
-  selectedCar: CarWithCategories | undefined;
+  deletedCars: CarType[];
+  selectedCar: CarWithCategories | null;
   selectedCarId: string | undefined;
   onSelect: (id: string) => void;
   onAddCar: (car: {
@@ -26,10 +27,13 @@ interface Props {
   onMoveCar: (id: string, direction: "up" | "down") => void;
   onReorderCars: (draggedId: string, targetId: string) => void;
   onDeleteCar: (id: string) => void;
+  onRestoreCar: (id: string) => void;
+  onPermanentlyDeleteCar: (id: string) => void;
 }
 
 export function Sidebar({
   cars,
+  deletedCars,
   selectedCar,
   selectedCarId,
   onSelect,
@@ -37,9 +41,13 @@ export function Sidebar({
   onMoveCar,
   onReorderCars,
   onDeleteCar,
+  onRestoreCar,
+  onPermanentlyDeleteCar,
 }: Props) {
   const [adding, setAdding] = useState(false);
   const [draggingCarId, setDraggingCarId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CarType | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [form, setForm] = useState({
     name: "",
     nickname: "",
@@ -153,7 +161,8 @@ export function Sidebar({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onDeleteCar(car.id);
+                      setDeleteTarget(car);
+                      setDeleteConfirmation("");
                     }}
                     className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all p-0.5"
                   >
@@ -183,6 +192,42 @@ export function Sidebar({
           )}
         </div>
       </div>
+
+      {deletedCars.length > 0 && (
+        <div className="bg-[#111111] border border-[#352020] rounded-xl overflow-hidden">
+          <div className="px-3 py-2 border-b border-[#241818] flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-widest text-red-400 font-semibold">
+              Recently Deleted
+            </span>
+            <Trash2 size={12} className="text-red-500/70" />
+          </div>
+          <div className="divide-y divide-[#1a1a1a]">
+            {deletedCars.map((car) => (
+              <div key={car.id} className="flex items-center gap-2 px-3 py-2.5">
+                <span className="flex-1 text-sm text-gray-400 truncate">
+                  {car.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onRestoreCar(car.id)}
+                  className="text-xs text-emerald-400 hover:text-emerald-300"
+                >
+                  Restore
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onPermanentlyDeleteCar(car.id)}
+                  className="text-gray-600 hover:text-red-400 p-1"
+                  aria-label={`Permanently delete ${car.name}`}
+                  title="Delete permanently"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {adding ? (
         <div className="bg-[#111111] border border-[#1e1e1e] rounded-xl p-3 space-y-2">
@@ -232,6 +277,54 @@ export function Sidebar({
         >
           <Plus size={14} /> New Build
         </button>
+      )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 px-4">
+          <div className="w-full max-w-md rounded-xl border border-red-900/60 bg-[#111111] p-5 shadow-2xl">
+            <div className="flex items-start gap-3">
+              <Trash2 size={20} className="mt-0.5 text-red-400" />
+              <div>
+                <h2 className="font-semibold text-white">
+                  Move build to Trash?
+                </h2>
+                <p className="mt-2 text-sm leading-5 text-gray-400">
+                  This will remove{" "}
+                  <span className="text-white">{deleteTarget.name}</span> and
+                  all of its parts, prices, links, statuses, and notes from your
+                  active builds. You can restore it for 30 days.
+                </p>
+              </div>
+            </div>
+            <input
+              value={deleteConfirmation}
+              onChange={(event) => setDeleteConfirmation(event.target.value)}
+              placeholder={`Type ${deleteTarget.name} to confirm`}
+              className="mt-4 w-full rounded-md border border-[#333] bg-[#0b0b0b] px-3 py-2 text-sm text-white focus:border-red-600 focus:outline-none"
+              autoFocus
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteTarget(null)}
+                className="rounded-md border border-[#333] px-3 py-2 text-sm text-gray-400 hover:text-white"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteConfirmation !== deleteTarget.name}
+                onClick={() => {
+                  onDeleteCar(deleteTarget.id);
+                  setDeleteTarget(null);
+                }}
+                className="rounded-md bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                Move to Trash
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </aside>
   );

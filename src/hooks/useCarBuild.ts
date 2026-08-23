@@ -28,6 +28,7 @@ interface ParsedImportCategory {
 
 interface ParsedImportBuild {
   carName: string;
+  basePrice: number | null;
   categories: ParsedImportCategory[];
 }
 
@@ -51,7 +52,12 @@ function normalizeStatusValue(
   const normalized = status?.trim().toLowerCase();
   if (normalized === "planned") return "planned";
   if (normalized === "installed") return "installed";
-  if (normalized === "onhand" || normalized === "bought") return "onHand";
+  if (
+    normalized === "onhand" ||
+    normalized === "on hand" ||
+    normalized === "bought"
+  )
+    return "onHand";
 
   return null;
 }
@@ -122,10 +128,12 @@ function parseBuildImport(rawText: string): ParsedImportBuild {
     .filter((line) => line.length > 0);
 
   let carName = "Imported Build";
+  let basePrice: number | null = null;
   let currentCategory = "General";
 
   const categories: ParsedImportCategory[] = [];
   const categoryMap = new Map<string, ParsedImportCategory>();
+  let lastImportedMod: ParsedImportMod | null = null;
 
   const ensureCategory = (name: string): ParsedImportCategory => {
     const normalizedName = name.trim() || "General";
@@ -139,38 +147,58 @@ function parseBuildImport(rawText: string): ParsedImportBuild {
   };
 
   for (const line of lines) {
-    const checklist = line.match(/^-\s*\[(x| )\]\s*(.+)$/i);
+    const cleanedLine = line.replace(/^\*+|\*+$/g, "").trim();
+    const basePriceMatch = cleanedLine.match(
+      /^-?\s*base\s+price\s*:\s*\$?\s*([\d,]+(?:\.\d{1,2})?)/i,
+    );
+    if (basePriceMatch) {
+      basePrice = Number.parseFloat(basePriceMatch[1].replace(/,/g, ""));
+      continue;
+    }
+
+    const checklist = cleanedLine.match(/^-\s*(?:\[(x| )\]\s*)?(.+)$/i);
 
     if (!checklist) {
+      const linkLine = cleanedLine.match(/^link:\s*(https?:\/\/\S+)/i);
+      if (linkLine && lastImportedMod) {
+        lastImportedMod.url = linkLine[1].replace(/[),.;]+$/, "");
+        continue;
+      }
+      const notesLine = cleanedLine.match(/^notes:\s*(.+)$/i);
+      if (notesLine && lastImportedMod) {
+        lastImportedMod.notes = notesLine[1].trim();
+        continue;
+      }
+
       const isPotentialCarName =
         carName === "Imported Build" &&
-        !line.includes("$") &&
-        !line.includes("=") &&
-        !line.endsWith(":") &&
-        !line.startsWith("-") &&
-        line.length <= 60;
+        !cleanedLine.includes("$") &&
+        !cleanedLine.includes("=") &&
+        !cleanedLine.endsWith(":") &&
+        !cleanedLine.startsWith("-") &&
+        cleanedLine.length <= 60;
 
       if (isPotentialCarName) {
-        carName = line;
+        carName = cleanedLine;
         continue;
       }
 
       const isHeading =
-        line.endsWith(":") ||
-        (/^[A-Za-z][A-Za-z0-9 &+/'()_-]{1,35}$/i.test(line) &&
-          !line.includes("$") &&
-          !line.includes("=") &&
-          !/^vin\b/i.test(line));
+        cleanedLine.endsWith(":") ||
+        (/^[A-Za-z][A-Za-z0-9 &+/'()_-]{1,35}$/i.test(cleanedLine) &&
+          !cleanedLine.includes("$") &&
+          !cleanedLine.includes("=") &&
+          !/^vin\b/i.test(cleanedLine));
 
       if (isHeading) {
-        currentCategory = line.replace(/:\s*$/, "").trim();
+        currentCategory = cleanedLine.replace(/:\s*$/, "").trim();
         ensureCategory(currentCategory);
       }
 
       continue;
     }
 
-    const checked = checklist[1].toLowerCase() === "x";
+    const checked = checklist[1]?.toLowerCase() === "x";
     const rawItem = checklist[2].trim();
     const category = ensureCategory(currentCategory);
 
@@ -182,8 +210,15 @@ function parseBuildImport(rawText: string): ParsedImportBuild {
         ? dollarValues.reduce((sum, value) => sum + value, 0)
         : null;
 
+    const statusMatch = withoutUrl.match(
+      /\[(planned|bought|on\s*hand|installed)\]/i,
+    );
+    const parsedStatus = normalizeStatusValue(statusMatch?.[1] ?? null);
+
     let name = withoutUrl
       .replace(/\$\s*[\d,]+(?:\.\d{1,2})?/g, "")
+      .replace(/\[(planned|bought|on\s*hand|installed)\]/gi, "")
+      .replace(/\*+/g, "")
       .replace(/[–-]\s*$/g, "")
       .replace(/\s{2,}/g, " ")
       .trim();
@@ -192,18 +227,24 @@ function parseBuildImport(rawText: string): ParsedImportBuild {
       name = withoutUrl;
     }
 
-    category.mods.push({
+    const importedMod: ParsedImportMod = {
       name,
       price_min: totalPrice,
       price_max: totalPrice,
       url,
-      status: checked ? "installed" : "planned",
+      status:
+        checked || parsedStatus === "installed"
+          ? "installed"
+          : (parsedStatus ?? "planned"),
       notes: null,
-    });
+    };
+    category.mods.push(importedMod);
+    lastImportedMod = importedMod;
   }
 
   return {
     carName,
+    basePrice,
     categories: categories.filter((category) => category.mods.length > 0),
   };
 }
@@ -217,6 +258,7 @@ interface UseCarBuildOptions {
 export function useCarBuild(options: UseCarBuildOptions = {}) {
   const { requireAuth = false, authReady = true, authUserId = null } = options;
   const [cars, setCars] = useState<Car[]>([]);
+  const [deletedCars, setDeletedCars] = useState<Car[]>([]);
   const [selectedCar, setSelectedCar] = useState<CarWithCategories | null>(
     null,
   );
@@ -249,6 +291,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
       const primaryResult = await client
         .from("cars")
         .select("*")
+        .is("deleted_at", null)
         .order("display_order", { ascending: true })
         .order("created_at", { ascending: true });
 
@@ -261,6 +304,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
         const fallbackResult = await client
           .from("cars")
           .select("*")
+          .is("deleted_at", null)
           .order("created_at", { ascending: true });
 
         data = fallbackResult.data;
@@ -270,6 +314,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
       const fallbackResult = await client
         .from("cars")
         .select("*")
+        .is("deleted_at", null)
         .order("created_at", { ascending: true });
 
       data = fallbackResult.data;
@@ -283,6 +328,39 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     setCars(data || []);
     return data;
   }, [getClient, supportsCarDisplayOrder]);
+
+  const fetchDeletedCars = useCallback(async () => {
+    const client = getClient();
+    if (!client) return [];
+
+    const { data, error } = await client
+      .from("cars")
+      .select("*")
+      .not("deleted_at", "is", null)
+      .order("deleted_at", { ascending: false });
+    if (error) {
+      setError(error.message);
+      return [];
+    }
+
+    const expired = (data || []).filter(
+      (car) =>
+        Date.now() - new Date(car.deleted_at ?? 0).getTime() > 30 * 86400000,
+    );
+    if (expired.length > 0) {
+      await client
+        .from("cars")
+        .delete()
+        .in(
+          "id",
+          expired.map((car) => car.id),
+        );
+    }
+
+    const current = (data || []).filter((car) => !expired.includes(car));
+    setDeletedCars(current);
+    return current;
+  }, [getClient]);
 
   function getPowerStageNumber(name: string): number | null {
     const stageMatch = name.match(/^stage\b\D*(\d+)/i);
@@ -418,6 +496,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     }
 
     const data = await fetchCars();
+    await fetchDeletedCars();
     if (data && data.length > 0) {
       const preferredCarId = selectedCarIdRef.current;
       const nextCarId =
@@ -429,7 +508,14 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
       setSelectedCar(null);
     }
     setLoading(false);
-  }, [authReady, authUserId, fetchCars, fetchCarDetails, requireAuth]);
+  }, [
+    authReady,
+    authUserId,
+    fetchCars,
+    fetchCarDetails,
+    fetchDeletedCars,
+    requireAuth,
+  ]);
 
   useEffect(() => {
     loadAll();
@@ -521,11 +607,15 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
       const client = getClient();
       if (!client) return;
 
-      const { error } = await client.from("cars").delete().eq("id", id);
+      const { error } = await client
+        .from("cars")
+        .update({ deleted_at: new Date().toISOString() })
+        .eq("id", id);
       if (error) {
         setError(error.message);
         return;
       }
+      await fetchDeletedCars();
       const data = await fetchCars();
       if (data && data.length > 0) {
         const previousSelectionId = selectedCarIdRef.current;
@@ -538,7 +628,113 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
         setSelectedCar(null);
       }
     },
-    [fetchCars, fetchCarDetails, getClient],
+    [fetchCars, fetchCarDetails, fetchDeletedCars, getClient],
+  );
+
+  const restoreCar = useCallback(
+    async (id: string) => {
+      const client = getClient();
+      if (!client) return;
+      const { error } = await client
+        .from("cars")
+        .update({ deleted_at: null })
+        .eq("id", id);
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      await fetchCars();
+      await fetchDeletedCars();
+    },
+    [fetchCars, fetchDeletedCars, getClient],
+  );
+
+  const permanentlyDeleteCar = useCallback(
+    async (id: string) => {
+      const client = getClient();
+      if (!client) return;
+      const { error } = await client.from("cars").delete().eq("id", id);
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      await fetchDeletedCars();
+    },
+    [fetchDeletedCars, getClient],
+  );
+
+  const duplicateCar = useCallback(
+    async (carId: string) => {
+      const client = getClient();
+      if (!client) return null;
+      const source =
+        selectedCar?.id === carId
+          ? selectedCar
+          : await (async () => {
+              const { data } = await client
+                .from("cars")
+                .select("*")
+                .eq("id", carId)
+                .maybeSingle();
+              return data ? { ...data, categories: [] } : null;
+            })();
+      if (!source) return null;
+
+      const { data: newCar, error: carError } = await client
+        .from("cars")
+        .insert({
+          name: `${source.name} Copy`,
+          car_nickname: source.car_nickname,
+          base_price: source.base_price,
+          out_the_door_price: source.out_the_door_price,
+          down_payment: source.down_payment,
+          image_url: source.image_url,
+        })
+        .select()
+        .maybeSingle();
+      if (carError || !newCar) {
+        setError(carError?.message ?? "Failed to duplicate build.");
+        return null;
+      }
+
+      for (const category of source.categories) {
+        const { data: newCategory, error: categoryError } = await client
+          .from("mod_categories")
+          .insert({
+            car_id: newCar.id,
+            name: category.name,
+            display_order: category.display_order,
+          })
+          .select()
+          .maybeSingle();
+        if (categoryError || !newCategory) {
+          setError(categoryError?.message ?? "Failed to duplicate category.");
+          return null;
+        }
+        if (category.mods.length > 0) {
+          const { error: modsError } = await client.from("mods").insert(
+            category.mods.map((mod) => ({
+              category_id: newCategory.id,
+              name: mod.name,
+              display_order: mod.display_order,
+              price_min: mod.price_min,
+              price_max: mod.price_max,
+              url: mod.url,
+              status: mod.status,
+              notes: mod.notes,
+            })),
+          );
+          if (modsError) {
+            setError(modsError.message);
+            return null;
+          }
+        }
+      }
+      await fetchCars();
+      await fetchCarDetails(newCar.id);
+      return newCar.id;
+    },
+    [fetchCarDetails, fetchCars, getClient, selectedCar],
   );
 
   const reorderCarsInList = useCallback(
@@ -742,7 +938,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
         .insert({
           name: parsed.carName,
           car_nickname: null,
-          base_price: null,
+          base_price: parsed.basePrice,
           out_the_door_price: null,
           down_payment: null,
           image_url: null,
@@ -1171,6 +1367,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
 
   return {
     cars,
+    deletedCars,
     selectedCar,
     loading,
     error,
@@ -1178,6 +1375,9 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     addCar,
     updateCar,
     deleteCar,
+    restoreCar,
+    permanentlyDeleteCar,
+    duplicateCar,
     reorderCarsInList,
     moveCarInList,
     addCategory,

@@ -59,6 +59,7 @@ export default function App() {
 
   const {
     cars,
+    deletedCars,
     selectedCar,
     loading,
     error,
@@ -66,6 +67,9 @@ export default function App() {
     addCar,
     updateCar,
     deleteCar,
+    restoreCar,
+    permanentlyDeleteCar,
+    duplicateCar,
     moveCarInList,
     reorderCarsInList,
     addCategory,
@@ -319,6 +323,8 @@ export default function App() {
             ? `${indent}  - ${mod.name} [${status}]`
             : `${indent}  - ${mod.name} [${status}] - ${priceText}`,
         );
+        if (mod.url) lines.push(`${indent}    Link: ${mod.url}`);
+        if (mod.notes) lines.push(`${indent}    Notes: ${mod.notes}`);
       }
 
       lines.push("");
@@ -662,6 +668,7 @@ export default function App() {
             </div>
             <Sidebar
               cars={cars}
+              deletedCars={deletedCars}
               selectedCar={selectedCar}
               selectedCarId={selectedCar?.id}
               onSelect={handleSelectCar}
@@ -669,6 +676,8 @@ export default function App() {
               onMoveCar={moveCar}
               onReorderCars={handleReorderCars}
               onDeleteCar={deleteCar}
+              onRestoreCar={restoreCar}
+              onPermanentlyDeleteCar={permanentlyDeleteCar}
             />
           </div>
         </div>
@@ -705,6 +714,7 @@ export default function App() {
           <div className="hidden md:block md:w-64 md:flex-shrink-0">
             <Sidebar
               cars={cars}
+              deletedCars={deletedCars}
               selectedCar={selectedCar}
               selectedCarId={selectedCar?.id}
               onSelect={handleSelectCar}
@@ -712,6 +722,8 @@ export default function App() {
               onMoveCar={moveCar}
               onReorderCars={handleReorderCars}
               onDeleteCar={deleteCar}
+              onRestoreCar={restoreCar}
+              onPermanentlyDeleteCar={permanentlyDeleteCar}
             />
           </div>
 
@@ -780,6 +792,16 @@ export default function App() {
                     className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md border border-[#2a2a2a] bg-[#111111] text-gray-300 hover:text-white hover:border-[#444] transition-colors"
                   >
                     {copiedBuildText ? "Copied" : "Copy Build"}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (!selectedCar) return;
+                      const duplicateId = await duplicateCar(selectedCar.id);
+                      if (duplicateId) setMobileBuildsOpen(false);
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-md border border-red-900/70 bg-red-950/30 text-red-300 hover:text-white hover:border-red-700 transition-colors"
+                  >
+                    Duplicate Build
                   </button>
                 </div>
 

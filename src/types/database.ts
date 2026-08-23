@@ -34,6 +34,7 @@ export interface Car {
   out_the_door_price: number | null;
   down_payment: number | null;
   image_url: string | null;
+  deleted_at: string | null;
   created_at: string;
 }
 
