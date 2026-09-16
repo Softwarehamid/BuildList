@@ -300,7 +300,6 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
         .from("cars")
         .select("*")
         .is("deleted_at", null)
-        .order("is_favorite", { ascending: false })
         .order("display_order", { ascending: true })
         .order("created_at", { ascending: true });
 
@@ -366,8 +365,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     if (!supportsCarFavorite) {
       const localFavoriteId = localStorage.getItem(favoriteStorageKey);
       nextCars = nextCars
-        .map((car) => ({ ...car, is_favorite: car.id === localFavoriteId }))
-        .sort((a, b) => Number(b.is_favorite) - Number(a.is_favorite));
+        .map((car) => ({ ...car, is_favorite: car.id === localFavoriteId }));
     }
 
     setCars(nextCars);
@@ -582,10 +580,11 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     await fetchGroups();
     if (data && data.length > 0) {
       const preferredCarId = selectedCarIdRef.current;
+      const favoriteCarId = data.find((car) => car.is_favorite)?.id;
       const nextCarId =
         preferredCarId && data.some((car) => car.id === preferredCarId)
           ? preferredCarId
-          : data[0].id;
+          : favoriteCarId ?? data[0].id;
       await fetchCarDetails(nextCarId);
     } else {
       setSelectedCar(null);
