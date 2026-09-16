@@ -29,6 +29,7 @@ export interface Car {
   user_id: string | null;
   name: string;
   car_nickname: string | null;
+  is_favorite: boolean;
   display_order: number;
   base_price: number | null;
   out_the_door_price: number | null;

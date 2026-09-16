@@ -272,6 +272,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [supportsCarDisplayOrder, setSupportsCarDisplayOrder] = useState(true);
+  const [supportsCarFavorite, setSupportsCarFavorite] = useState(true);
   const [supportsModDisplayOrder, setSupportsModDisplayOrder] = useState(true);
 
   const getClient = useCallback(() => {
@@ -293,16 +294,34 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     let data: Car[] | null = null;
     let error: { message: string } | null = null;
 
-    if (supportsCarDisplayOrder) {
+    if (supportsCarDisplayOrder && supportsCarFavorite) {
       const primaryResult = await client
         .from("cars")
         .select("*")
         .is("deleted_at", null)
+        .order("is_favorite", { ascending: false })
         .order("display_order", { ascending: true })
         .order("created_at", { ascending: true });
 
       data = primaryResult.data;
       error = primaryResult.error;
+
+      if (
+        error &&
+        /is_favorite.*column|column.*is_favorite|schema cache/i.test(
+          error.message,
+        )
+      ) {
+        setSupportsCarFavorite(false);
+        const favoriteFallback = await client
+          .from("cars")
+          .select("*")
+          .is("deleted_at", null)
+          .order("display_order", { ascending: true })
+          .order("created_at", { ascending: true });
+        data = favoriteFallback.data;
+        error = favoriteFallback.error;
+      }
 
       if (error && isCarOrderColumnMissingError(error.message)) {
         setSupportsCarDisplayOrder(false);
@@ -316,6 +335,16 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
         data = fallbackResult.data;
         error = fallbackResult.error;
       }
+    } else if (supportsCarDisplayOrder) {
+      const fallbackResult = await client
+        .from("cars")
+        .select("*")
+        .is("deleted_at", null)
+        .order("display_order", { ascending: true })
+        .order("created_at", { ascending: true });
+
+      data = fallbackResult.data;
+      error = fallbackResult.error;
     } else {
       const fallbackResult = await client
         .from("cars")
@@ -333,7 +362,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     }
     setCars(data || []);
     return data;
-  }, [getClient, supportsCarDisplayOrder]);
+  }, [getClient, supportsCarDisplayOrder, supportsCarFavorite]);
 
   const fetchDeletedCars = useCallback(async () => {
     const client = getClient();
@@ -702,6 +731,40 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     [fetchCars, selectedCar, getClient],
   );
 
+  const toggleFavorite = useCallback(
+    async (id: string) => {
+      const client = getClient();
+      if (!client || !supportsCarFavorite) return;
+
+      const nextFavorite = !cars.find((car) => car.id === id)?.is_favorite;
+      const { error: clearError } = await client
+        .from("cars")
+        .update({ is_favorite: false })
+        .neq("id", id);
+      if (clearError) {
+        setError(clearError.message);
+        return;
+      }
+
+      const { error } = await client
+        .from("cars")
+        .update({ is_favorite: nextFavorite })
+        .eq("id", id);
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      await fetchCars();
+      if (selectedCar?.id === id) {
+        setSelectedCar((current) =>
+          current ? { ...current, is_favorite: nextFavorite } : current,
+        );
+      }
+    },
+    [cars, fetchCars, getClient, selectedCar, supportsCarFavorite],
+  );
+
   const deleteCar = useCallback(
     async (id: string) => {
       const client = getClient();
@@ -962,7 +1025,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
 
       const maxOrder =
         selectedCar?.categories.reduce(
-          (m, c) => Math.max(m, c.display_order),
+          (m, c) => Math.max(m, c.display_order ?? 0),
           0,
         ) ?? 0;
       const { error } = await client
@@ -1477,6 +1540,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     selectCar,
     addCar,
     updateCar,
+    toggleFavorite,
     deleteCar,
     restoreCar,
     permanentlyDeleteCar,

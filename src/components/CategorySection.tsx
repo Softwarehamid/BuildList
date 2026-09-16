@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
-  GripVertical,
   Plus,
   Pencil,
   Trash2,
@@ -21,20 +20,12 @@ interface Props {
   statusFilter?: string[];
   canMoveUp: boolean;
   canMoveDown: boolean;
-  dragging?: boolean;
-  onDragStart?: () => void;
-  onDragEnd?: () => void;
   onMoveUp: (id: string) => void;
   onMoveDown: (id: string) => void;
   onMoveMod: (
     categoryId: string,
     modId: string,
     direction: "up" | "down",
-  ) => void;
-  onReorderMods: (
-    categoryId: string,
-    draggedId: string,
-    targetId: string,
   ) => void;
   onUpdateCategory: (id: string, name: string) => void;
   onDeleteCategory: (id: string) => void;
@@ -72,13 +63,9 @@ export function CategorySection({
   statusFilter = ["planned", "onHand", "installed"],
   canMoveUp,
   canMoveDown,
-  dragging = false,
-  onDragStart,
-  onDragEnd,
   onMoveUp,
   onMoveDown,
   onMoveMod,
-  onReorderMods,
   onUpdateCategory,
   onDeleteCategory,
   onAddMod,
@@ -89,7 +76,6 @@ export function CategorySection({
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState(category.name);
   const [addingMod, setAddingMod] = useState(false);
-  const [draggingModId, setDraggingModId] = useState<string | null>(null);
   const [form, setForm] = useState<AddModForm>({
     name: "",
     priceMin: "",
@@ -152,23 +138,6 @@ export function CategorySection({
         className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-white/[0.02] transition-colors"
         onClick={() => setOpen((o) => !o)}
       >
-        {onDragStart && (
-          <button
-            type="button"
-            draggable
-            onClick={(e) => e.stopPropagation()}
-            onDragStart={(e) => {
-              e.dataTransfer.effectAllowed = "move";
-              onDragStart();
-            }}
-            onDragEnd={onDragEnd}
-            className={`text-gray-600 hover:text-gray-300 transition-colors p-0.5 -ml-1 cursor-grab active:cursor-grabbing ${dragging ? "opacity-100" : "opacity-70"}`}
-            aria-label="Drag category to reorder"
-            title="Drag to reorder"
-          >
-            <GripVertical size={14} />
-          </button>
-        )}
         <div
           className="w-[3px] h-5 rounded-full flex-shrink-0"
           style={{ backgroundColor: color }}
@@ -270,20 +239,7 @@ export function CategorySection({
             </p>
           )}
           {sortedMods.map((mod, index) => (
-            <div
-              key={mod.id}
-              draggable
-              onDragStart={() => setDraggingModId(mod.id)}
-              onDragEnd={() => setDraggingModId(null)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                if (draggingModId && draggingModId !== mod.id) {
-                  onReorderMods(category.id, draggingModId, mod.id);
-                }
-              }}
-              className={`flex items-center gap-1 cursor-grab active:cursor-grabbing ${draggingModId === mod.id ? "opacity-60" : "opacity-100"}`}
-            >
+            <div key={mod.id} className="flex items-center gap-1">
               <div className="flex flex-col gap-0.5">
                 <button
                   onClick={() => onMoveMod(category.id, mod.id, "up")}

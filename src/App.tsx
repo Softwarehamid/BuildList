@@ -69,6 +69,7 @@ export default function App() {
     selectCar,
     addCar,
     updateCar,
+    toggleFavorite,
     deleteCar,
     restoreCar,
     permanentlyDeleteCar,
@@ -77,12 +78,10 @@ export default function App() {
     assignCarToGroups,
     setAllowMultipleGroups,
     moveCarInList,
-    reorderCarsInList,
     addCategory,
     addPowerStage,
     importBuildFromText,
     movePowerGroup,
-    reorderCategoriesInList,
     updateCategory,
     deleteCategory,
     moveCategoryInList,
@@ -103,12 +102,6 @@ export default function App() {
   const [importText, setImportText] = useState("");
   const [importing, setImporting] = useState(false);
   const [mobileBuildsOpen, setMobileBuildsOpen] = useState(false);
-  const [draggingRegularCategoryId, setDraggingRegularCategoryId] = useState<
-    string | null
-  >(null);
-  const [draggingPowerCategoryId, setDraggingPowerCategoryId] = useState<
-    string | null
-  >(null);
   const [copiedBuildText, setCopiedBuildText] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string[]>([
     "planned",
@@ -365,29 +358,6 @@ export default function App() {
     moveCarInList(orderedCarIds, id, direction);
   };
 
-  const reorderByDrop = (
-    orderedIds: string[],
-    draggedId: string,
-    targetId: string,
-  ) => {
-    const fromIndex = orderedIds.indexOf(draggedId);
-    const toIndex = orderedIds.indexOf(targetId);
-    if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
-      return orderedIds;
-    }
-
-    const next = [...orderedIds];
-    const [moved] = next.splice(fromIndex, 1);
-    next.splice(toIndex, 0, moved);
-    return next;
-  };
-
-  const handleReorderCars = (draggedId: string, targetId: string) => {
-    const orderedCarIds = cars.map((car) => car.id);
-    const reordered = reorderByDrop(orderedCarIds, draggedId, targetId);
-    reorderCarsInList(reordered);
-  };
-
   const moveInOrderedSet = (
     orderedIds: string[],
     categoryId: string,
@@ -421,69 +391,6 @@ export default function App() {
     const [moved] = reordered.splice(currentIndex, 1);
     reordered.splice(targetIndex, 0, moved);
     reorderModsInCategory(selectedCar.id, reordered);
-  };
-
-  const handleReorderMods = (
-    categoryId: string,
-    draggedId: string,
-    targetId: string,
-  ) => {
-    if (!selectedCar) return;
-    const category = selectedCar.categories.find((c) => c.id === categoryId);
-    if (!category) return;
-
-    const orderedModIds = [...category.mods]
-      .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
-      .map((m) => m.id);
-
-    const reordered = reorderByDrop(orderedModIds, draggedId, targetId);
-    reorderModsInCategory(selectedCar.id, reordered);
-  };
-
-  const reorderSubsetInFullOrder = (
-    fullOrder: string[],
-    subsetCurrentOrder: string[],
-    subsetReordered: string[],
-  ) => {
-    const subsetSet = new Set(subsetCurrentOrder);
-    let idx = 0;
-    return fullOrder.map((id) => {
-      if (!subsetSet.has(id)) return id;
-      const next = subsetReordered[idx];
-      idx += 1;
-      return next;
-    });
-  };
-
-  const handleReorderRegularCategories = (
-    draggedId: string,
-    targetId: string,
-  ) => {
-    if (!selectedCar) return;
-
-    const reorderedRegular = reorderByDrop(regularIds, draggedId, targetId);
-    const fullOrder = orderedCategories.map((c) => c.id);
-    const reorderedFull = reorderSubsetInFullOrder(
-      fullOrder,
-      regularIds,
-      reorderedRegular,
-    );
-
-    reorderCategoriesInList(selectedCar.id, reorderedFull);
-  };
-
-  const handleReorderPowerStages = (draggedId: string, targetId: string) => {
-    if (!selectedCar) return;
-
-    const reorderedPower = reorderByDrop(powerStageIds, draggedId, targetId);
-    const fullOrder = orderedCategories.map((c) => c.id);
-    const reorderedFull = reorderSubsetInFullOrder(
-      fullOrder,
-      powerStageIds,
-      reorderedPower,
-    );
-
-    reorderCategoriesInList(selectedCar.id, reorderedFull);
   };
 
   const orderedCategories = selectedCar
@@ -683,7 +590,7 @@ export default function App() {
               onSelect={handleSelectCar}
               onAddCar={handleAddCar}
               onMoveCar={moveCar}
-              onReorderCars={handleReorderCars}
+              onToggleFavorite={toggleFavorite}
               onDeleteCar={deleteCar}
               onRestoreCar={restoreCar}
               onPermanentlyDeleteCar={permanentlyDeleteCar}
@@ -737,7 +644,7 @@ export default function App() {
               onSelect={handleSelectCar}
               onAddCar={handleAddCar}
               onMoveCar={moveCar}
-              onReorderCars={handleReorderCars}
+              onToggleFavorite={toggleFavorite}
               onDeleteCar={deleteCar}
               onRestoreCar={restoreCar}
               onPermanentlyDeleteCar={permanentlyDeleteCar}
@@ -837,23 +744,7 @@ export default function App() {
                       if (!cat) return null;
 
                       return (
-                        <div
-                          key={cat.id}
-                          onDragOver={(e) => e.preventDefault()}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            if (
-                              draggingRegularCategoryId &&
-                              draggingRegularCategoryId !== cat.id
-                            ) {
-                              handleReorderRegularCategories(
-                                draggingRegularCategoryId,
-                                cat.id,
-                              );
-                            }
-                          }}
-                          className={`${draggingRegularCategoryId === cat.id ? "opacity-60" : "opacity-100"}`}
-                        >
+                        <div key={cat.id}>
                           <CategorySection
                             category={cat}
                             statusFilter={statusFilter}
@@ -861,11 +752,6 @@ export default function App() {
                             canMoveDown={
                               currentRegularIndex < regularIds.length - 1
                             }
-                            dragging={draggingRegularCategoryId === cat.id}
-                            onDragStart={() =>
-                              setDraggingRegularCategoryId(cat.id)
-                            }
-                            onDragEnd={() => setDraggingRegularCategoryId(null)}
                             onMoveUp={(id) =>
                               moveInOrderedSet(regularIds, id, "up")
                             }
@@ -873,7 +759,6 @@ export default function App() {
                               moveInOrderedSet(regularIds, id, "down")
                             }
                             onMoveMod={moveModInCategory}
-                            onReorderMods={handleReorderMods}
                             onUpdateCategory={(id, name) =>
                               updateCategory(id, name, selectedCar.id)
                             }
@@ -972,38 +857,13 @@ export default function App() {
                                 ? `Stage ${stageNumber}`
                                 : cat.name;
                               return (
-                                <div
-                                  key={cat.id}
-                                  onDragOver={(e) => e.preventDefault()}
-                                  onDrop={(e) => {
-                                    e.preventDefault();
-                                    if (
-                                      draggingPowerCategoryId &&
-                                      draggingPowerCategoryId !== cat.id
-                                    ) {
-                                      handleReorderPowerStages(
-                                        draggingPowerCategoryId,
-                                        cat.id,
-                                      );
-                                    }
-                                  }}
-                                  className={`${draggingPowerCategoryId === cat.id ? "opacity-60" : "opacity-100"}`}
-                                >
+                                <div key={cat.id}>
                                   <CategorySection
                                     category={cat}
                                     displayName={displayName}
                                     statusFilter={statusFilter}
                                     canMoveUp={index > 0}
                                     canMoveDown={index < powerStages.length - 1}
-                                    dragging={
-                                      draggingPowerCategoryId === cat.id
-                                    }
-                                    onDragStart={() =>
-                                      setDraggingPowerCategoryId(cat.id)
-                                    }
-                                    onDragEnd={() =>
-                                      setDraggingPowerCategoryId(null)
-                                    }
                                     onMoveUp={(id) =>
                                       moveInOrderedSet(powerStageIds, id, "up")
                                     }
@@ -1015,7 +875,6 @@ export default function App() {
                                       )
                                     }
                                     onMoveMod={moveModInCategory}
-                                    onReorderMods={handleReorderMods}
                                     onUpdateCategory={(id, name) =>
                                       updateCategory(id, name, selectedCar.id)
                                     }

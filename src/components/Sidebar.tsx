@@ -4,7 +4,6 @@ import {
   Car,
   Trash2,
   ChevronRight,
-  GripVertical,
   X,
   Check,
   Gauge,
@@ -12,6 +11,7 @@ import {
   ArrowDown,
   ChevronDown,
   Settings,
+  Star,
 } from "lucide-react";
 import type {
   Car as CarType,
@@ -34,7 +34,7 @@ interface Props {
     base_price: number | null;
   }) => void;
   onMoveCar: (id: string, direction: "up" | "down") => void;
-  onReorderCars: (draggedId: string, targetId: string) => void;
+  onToggleFavorite: (id: string) => void;
   onDeleteCar: (id: string) => void;
   onRestoreCar: (id: string) => void;
   onPermanentlyDeleteCar: (id: string) => void;
@@ -54,7 +54,7 @@ export function Sidebar({
   onSelect,
   onAddCar,
   onMoveCar,
-  onReorderCars,
+  onToggleFavorite,
   onDeleteCar,
   onRestoreCar,
   onPermanentlyDeleteCar,
@@ -63,7 +63,6 @@ export function Sidebar({
   onSetAllowMultipleGroups,
 }: Props) {
   const [adding, setAdding] = useState(false);
-  const [draggingCarId, setDraggingCarId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CarType | null>(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
@@ -210,32 +209,10 @@ export function Sidebar({
                 )}
                 <div
                   key={car.id}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    if (draggingCarId && draggingCarId !== car.id) {
-                      onReorderCars(draggingCarId, car.id);
-                    }
-                  }}
-                  className={`group flex flex-col gap-1.5 px-3 py-2.5 transition-colors ${selectedCarId === car.id ? "bg-red-950/30" : "hover:bg-white/[0.03]"} ${draggingCarId === car.id ? "opacity-60" : "opacity-100"}`}
+                  className={`group flex flex-col gap-1.5 px-3 py-2.5 transition-colors ${selectedCarId === car.id ? "bg-red-950/30" : "hover:bg-white/[0.03]"}`}
                   onClick={() => onSelect(car.id)}
                 >
                   <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      draggable
-                      onClick={(e) => e.stopPropagation()}
-                      onDragStart={(e) => {
-                        e.dataTransfer.effectAllowed = "move";
-                        setDraggingCarId(car.id);
-                      }}
-                      onDragEnd={() => setDraggingCarId(null)}
-                      className="text-gray-600 hover:text-gray-300 transition-colors p-0.5 cursor-grab active:cursor-grabbing"
-                      aria-label="Drag build to reorder"
-                      title="Drag to reorder"
-                    >
-                      <GripVertical size={12} />
-                    </button>
                     <Car
                       size={13}
                       className={
@@ -252,6 +229,24 @@ export function Sidebar({
                     {selectedCarId === car.id && (
                       <ChevronRight size={12} className="text-red-500" />
                     )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleFavorite(car.id);
+                      }}
+                      className={`transition-colors p-0.5 ${car.is_favorite ? "text-amber-400" : "text-gray-700 hover:text-amber-300"}`}
+                      aria-label={
+                        car.is_favorite ? "Unfavorite build" : "Favorite build"
+                      }
+                      title={
+                        car.is_favorite ? "Unfavorite build" : "Favorite build"
+                      }
+                    >
+                      <Star
+                        size={12}
+                        fill={car.is_favorite ? "currentColor" : "none"}
+                      />
+                    </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
