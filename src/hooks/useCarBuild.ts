@@ -273,6 +273,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
   const [error, setError] = useState<string | null>(null);
   const [supportsCarDisplayOrder, setSupportsCarDisplayOrder] = useState(true);
   const [supportsCarFavorite, setSupportsCarFavorite] = useState(true);
+  const favoriteStorageKey = `buildlist.favoriteCar.${authUserId ?? "anonymous"}`;
   const [supportsModDisplayOrder, setSupportsModDisplayOrder] = useState(true);
 
   const getClient = useCallback(() => {
@@ -360,9 +361,23 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
       setError(error.message);
       return;
     }
-    setCars(data || []);
-    return data;
-  }, [getClient, supportsCarDisplayOrder, supportsCarFavorite]);
+
+    let nextCars = data || [];
+    if (!supportsCarFavorite) {
+      const localFavoriteId = localStorage.getItem(favoriteStorageKey);
+      nextCars = nextCars
+        .map((car) => ({ ...car, is_favorite: car.id === localFavoriteId }))
+        .sort((a, b) => Number(b.is_favorite) - Number(a.is_favorite));
+    }
+
+    setCars(nextCars);
+    return nextCars;
+  }, [
+    favoriteStorageKey,
+    getClient,
+    supportsCarDisplayOrder,
+    supportsCarFavorite,
+  ]);
 
   const fetchDeletedCars = useCallback(async () => {
     const client = getClient();
@@ -734,7 +749,18 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
   const toggleFavorite = useCallback(
     async (id: string) => {
       const client = getClient();
-      if (!client || !supportsCarFavorite) return;
+      if (!client) return;
+
+      if (!supportsCarFavorite) {
+        const currentFavoriteId = localStorage.getItem(favoriteStorageKey);
+        if (currentFavoriteId === id) {
+          localStorage.removeItem(favoriteStorageKey);
+        } else {
+          localStorage.setItem(favoriteStorageKey, id);
+        }
+        await fetchCars();
+        return;
+      }
 
       const nextFavorite = !cars.find((car) => car.id === id)?.is_favorite;
       const { error: clearError } = await client
@@ -762,7 +788,14 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
         );
       }
     },
-    [cars, fetchCars, getClient, selectedCar, supportsCarFavorite],
+    [
+      cars,
+      favoriteStorageKey,
+      fetchCars,
+      getClient,
+      selectedCar,
+      supportsCarFavorite,
+    ],
   );
 
   const deleteCar = useCallback(
