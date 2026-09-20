@@ -364,8 +364,10 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     let nextCars = data || [];
     if (!supportsCarFavorite) {
       const localFavoriteId = localStorage.getItem(favoriteStorageKey);
-      nextCars = nextCars
-        .map((car) => ({ ...car, is_favorite: car.id === localFavoriteId }));
+      nextCars = nextCars.map((car) => ({
+        ...car,
+        is_favorite: car.id === localFavoriteId,
+      }));
     }
 
     setCars(nextCars);
@@ -584,7 +586,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
       const nextCarId =
         preferredCarId && data.some((car) => car.id === preferredCarId)
           ? preferredCarId
-          : favoriteCarId ?? data[0].id;
+          : (favoriteCarId ?? data[0].id);
       await fetchCarDetails(nextCarId);
     } else {
       setSelectedCar(null);
@@ -848,11 +850,22 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     async (id: string) => {
       const client = getClient();
       if (!client) return;
-      const { error } = await client.from("cars").delete().eq("id", id);
+      const { data, error } = await client
+        .from("cars")
+        .delete()
+        .eq("id", id)
+        .select("id");
       if (error) {
         setError(error.message);
         return;
       }
+
+      if (!data || data.length === 0) {
+        setError("This build could not be permanently deleted.");
+        return;
+      }
+
+      setDeletedCars((current) => current.filter((car) => car.id !== id));
       await fetchDeletedCars();
     },
     [fetchDeletedCars, getClient],
