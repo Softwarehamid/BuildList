@@ -850,18 +850,9 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     async (id: string) => {
       const client = getClient();
       if (!client) return;
-      const { data, error } = await client
-        .from("cars")
-        .delete()
-        .eq("id", id)
-        .select("id");
+      const { error } = await client.from("cars").delete().eq("id", id);
       if (error) {
         setError(error.message);
-        return;
-      }
-
-      if (!data || data.length === 0) {
-        setError("This build could not be permanently deleted.");
         return;
       }
 
