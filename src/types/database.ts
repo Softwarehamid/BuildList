@@ -3,8 +3,9 @@ export interface Database {
     Tables: {
       cars: {
         Row: Car;
-        Insert: Omit<Car, "id" | "created_at" | "user_id"> & {
+        Insert: Omit<Car, "id" | "created_at" | "user_id" | "hidden_at"> & {
           user_id?: string | null;
+          hidden_at?: string | null;
         };
         Update: Partial<Omit<Car, "id" | "created_at">>;
       };
@@ -35,6 +36,7 @@ export interface Car {
   out_the_door_price: number | null;
   down_payment: number | null;
   image_url: string | null;
+  hidden_at: string | null;
   deleted_at: string | null;
   created_at: string;
 }

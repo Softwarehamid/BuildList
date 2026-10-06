@@ -59,6 +59,7 @@ export default function App() {
 
   const {
     cars,
+    hiddenCars,
     deletedCars,
     groups,
     carGroupIds,
@@ -70,6 +71,8 @@ export default function App() {
     addCar,
     updateCar,
     toggleFavorite,
+    hideCar,
+    unhideCar,
     deleteCar,
     restoreCar,
     permanentlyDeleteCar,
@@ -581,6 +584,7 @@ export default function App() {
             </div>
             <Sidebar
               cars={cars}
+              hiddenCars={hiddenCars}
               deletedCars={deletedCars}
               groups={groups}
               carGroupIds={carGroupIds}
@@ -591,6 +595,8 @@ export default function App() {
               onAddCar={handleAddCar}
               onMoveCar={moveCar}
               onToggleFavorite={toggleFavorite}
+              onHideCar={hideCar}
+              onUnhideCar={unhideCar}
               onDeleteCar={deleteCar}
               onRestoreCar={restoreCar}
               onPermanentlyDeleteCar={permanentlyDeleteCar}
@@ -635,6 +641,7 @@ export default function App() {
           <div className="hidden md:block md:w-64 md:flex-shrink-0">
             <Sidebar
               cars={cars}
+              hiddenCars={hiddenCars}
               deletedCars={deletedCars}
               groups={groups}
               carGroupIds={carGroupIds}
@@ -645,6 +652,8 @@ export default function App() {
               onAddCar={handleAddCar}
               onMoveCar={moveCar}
               onToggleFavorite={toggleFavorite}
+              onHideCar={hideCar}
+              onUnhideCar={unhideCar}
               onDeleteCar={deleteCar}
               onRestoreCar={restoreCar}
               onPermanentlyDeleteCar={permanentlyDeleteCar}

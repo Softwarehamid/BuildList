@@ -12,6 +12,8 @@ import {
   ChevronDown,
   Settings,
   Star,
+  EyeOff,
+  Eye,
 } from "lucide-react";
 import type {
   Car as CarType,
@@ -21,6 +23,7 @@ import type {
 
 interface Props {
   cars: CarType[];
+  hiddenCars: CarType[];
   deletedCars: CarType[];
   groups: CarGroup[];
   carGroupIds: Record<string, string[]>;
@@ -35,6 +38,8 @@ interface Props {
   }) => void;
   onMoveCar: (id: string, direction: "up" | "down") => void;
   onToggleFavorite: (id: string) => void;
+  onHideCar: (id: string) => void;
+  onUnhideCar: (id: string) => void;
   onDeleteCar: (id: string) => void;
   onRestoreCar: (id: string) => void;
   onPermanentlyDeleteCar: (id: string) => void;
@@ -45,6 +50,7 @@ interface Props {
 
 export function Sidebar({
   cars,
+  hiddenCars,
   deletedCars,
   groups,
   carGroupIds,
@@ -55,6 +61,8 @@ export function Sidebar({
   onAddCar,
   onMoveCar,
   onToggleFavorite,
+  onHideCar,
+  onUnhideCar,
   onDeleteCar,
   onRestoreCar,
   onPermanentlyDeleteCar,
@@ -110,6 +118,34 @@ export function Sidebar({
           BuildList
         </span>
       </div>
+
+      {hiddenCars.length > 0 && (
+        <div className="bg-[#111111] border border-[#242424] rounded-xl overflow-hidden">
+          <div className="px-3 py-2 border-b border-[#1a1a1a] flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">
+              Hidden Builds
+            </span>
+            <EyeOff size={12} className="text-gray-600" />
+          </div>
+          <div className="divide-y divide-[#1a1a1a]">
+            {hiddenCars.map((car) => (
+              <div key={car.id} className="flex items-center gap-2 px-3 py-2.5">
+                <span className="flex-1 text-sm text-gray-500 truncate">
+                  {car.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onUnhideCar(car.id)}
+                  className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-white"
+                  title={`Show ${car.name}`}
+                >
+                  <Eye size={12} /> Show
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="bg-[#111111] border border-[#1e1e1e] rounded-xl overflow-hidden">
         <div className="px-3 py-2 border-b border-[#1a1a1a]">
@@ -276,8 +312,20 @@ export function Sidebar({
                         setDeleteConfirmation("");
                       }}
                       className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all p-0.5"
+                      aria-label={`Move ${car.name} to trash`}
                     >
                       <Trash2 size={11} />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onHideCar(car.id);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-gray-300 transition-all p-0.5"
+                      aria-label={`Hide ${car.name}`}
+                      title="Hide build"
+                    >
+                      <EyeOff size={11} />
                     </button>
                   </div>
                   {progress !== null && (

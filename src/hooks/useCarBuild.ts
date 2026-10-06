@@ -259,6 +259,7 @@ interface UseCarBuildOptions {
 export function useCarBuild(options: UseCarBuildOptions = {}) {
   const { requireAuth = false, authReady = true, authUserId = null } = options;
   const [cars, setCars] = useState<Car[]>([]);
+  const [hiddenCars, setHiddenCars] = useState<Car[]>([]);
   const [deletedCars, setDeletedCars] = useState<Car[]>([]);
   const [groups, setGroups] = useState<CarGroup[]>([]);
   const [carGroupIds, setCarGroupIds] = useState<Record<string, string[]>>({});
@@ -300,6 +301,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
         .from("cars")
         .select("*")
         .is("deleted_at", null)
+        .is("hidden_at", null)
         .order("display_order", { ascending: true })
         .order("created_at", { ascending: true });
 
@@ -317,6 +319,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
           .from("cars")
           .select("*")
           .is("deleted_at", null)
+          .is("hidden_at", null)
           .order("display_order", { ascending: true })
           .order("created_at", { ascending: true });
         data = favoriteFallback.data;
@@ -330,6 +333,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
           .from("cars")
           .select("*")
           .is("deleted_at", null)
+          .is("hidden_at", null)
           .order("created_at", { ascending: true });
 
         data = fallbackResult.data;
@@ -340,6 +344,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
         .from("cars")
         .select("*")
         .is("deleted_at", null)
+        .is("hidden_at", null)
         .order("display_order", { ascending: true })
         .order("created_at", { ascending: true });
 
@@ -350,6 +355,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
         .from("cars")
         .select("*")
         .is("deleted_at", null)
+        .is("hidden_at", null)
         .order("created_at", { ascending: true });
 
       data = fallbackResult.data;
@@ -378,6 +384,26 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     supportsCarDisplayOrder,
     supportsCarFavorite,
   ]);
+
+  const fetchHiddenCars = useCallback(async () => {
+    const client = getClient();
+    if (!client) return [];
+
+    const { data, error } = await client
+      .from("cars")
+      .select("*")
+      .is("deleted_at", null)
+      .not("hidden_at", "is", null)
+      .order("hidden_at", { ascending: false });
+    if (error) {
+      setError(error.message);
+      return [];
+    }
+
+    const current = data || [];
+    setHiddenCars(current);
+    return current;
+  }, [getClient]);
 
   const fetchDeletedCars = useCallback(async () => {
     const client = getClient();
@@ -578,6 +604,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     }
 
     const data = await fetchCars();
+    await fetchHiddenCars();
     await fetchDeletedCars();
     await fetchGroups();
     if (data && data.length > 0) {
@@ -598,6 +625,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     fetchCars,
     fetchCarDetails,
     fetchDeletedCars,
+    fetchHiddenCars,
     fetchGroups,
     requireAuth,
   ]);
@@ -826,6 +854,53 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
       }
     },
     [fetchCars, fetchCarDetails, fetchDeletedCars, getClient],
+  );
+
+  const hideCar = useCallback(
+    async (id: string) => {
+      const client = getClient();
+      if (!client) return;
+
+      const { error } = await client
+        .from("cars")
+        .update({ hidden_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      const data = await fetchCars();
+      await fetchHiddenCars();
+      if (selectedCarIdRef.current === id) {
+        const nextCarId = data?.[0]?.id;
+        if (nextCarId) {
+          await fetchCarDetails(nextCarId);
+        } else {
+          setSelectedCar(null);
+        }
+      }
+    },
+    [fetchCarDetails, fetchCars, fetchHiddenCars, getClient],
+  );
+
+  const unhideCar = useCallback(
+    async (id: string) => {
+      const client = getClient();
+      if (!client) return;
+
+      const { error } = await client
+        .from("cars")
+        .update({ hidden_at: null })
+        .eq("id", id);
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      await fetchCars();
+      await fetchHiddenCars();
+    },
+    [fetchCars, fetchHiddenCars, getClient],
   );
 
   const restoreCar = useCallback(
@@ -1566,6 +1641,7 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
 
   return {
     cars,
+    hiddenCars,
     deletedCars,
     groups,
     carGroupIds,
@@ -1577,6 +1653,8 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     addCar,
     updateCar,
     toggleFavorite,
+    hideCar,
+    unhideCar,
     deleteCar,
     restoreCar,
     permanentlyDeleteCar,
