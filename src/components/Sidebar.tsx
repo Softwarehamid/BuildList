@@ -101,14 +101,18 @@ export function Sidebar({
     setAdding(false);
   };
 
-  const carEntries = cars.flatMap((car) => {
-    const assignedGroupIds = carGroupIds[car.id] || [];
-    const entryGroupIds =
-      allowMultipleGroups && assignedGroupIds.length > 0
-        ? assignedGroupIds
-        : [assignedGroupIds[0] || "uncategorized"];
-    return entryGroupIds.map((groupId) => ({ car, groupId }));
-  });
+  const orderedGroupIds = [...groups.map((group) => group.id), "uncategorized"];
+  const carEntries = orderedGroupIds.flatMap((groupId) =>
+    cars.flatMap((car) => {
+      const assignedGroupIds = carGroupIds[car.id] || [];
+      const entryGroupIds =
+        allowMultipleGroups && assignedGroupIds.length > 0
+          ? assignedGroupIds
+          : [assignedGroupIds[0] || "uncategorized"];
+
+      return entryGroupIds.includes(groupId) ? [{ car, groupId }] : [];
+    }),
+  );
 
   return (
     <aside className="w-full md:w-64 flex-shrink-0 flex flex-col gap-4">
