@@ -80,6 +80,8 @@ export default function App() {
     addGroup,
     assignCarToGroups,
     moveGroupInList,
+    renameGroup,
+    deleteGroup,
     setAllowMultipleGroups,
     moveCarInList,
     addCategory,
@@ -605,6 +607,8 @@ export default function App() {
                 void addGroup(name);
               }}
               onMoveGroup={moveGroupInList}
+              onRenameGroup={renameGroup}
+              onDeleteGroup={deleteGroup}
               onAssignCarToGroups={assignCarToGroups}
               onSetAllowMultipleGroups={setAllowMultipleGroups}
             />
@@ -663,6 +667,8 @@ export default function App() {
                 void addGroup(name);
               }}
               onMoveGroup={moveGroupInList}
+              onRenameGroup={renameGroup}
+              onDeleteGroup={deleteGroup}
               onAssignCarToGroups={assignCarToGroups}
               onSetAllowMultipleGroups={setAllowMultipleGroups}
             />

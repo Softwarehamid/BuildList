@@ -742,6 +742,44 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     [groups, reorderGroupsInList],
   );
 
+  const renameGroup = useCallback(
+    async (groupId: string, name: string) => {
+      const client = getClient();
+      if (!client || !name.trim()) return;
+
+      const { error } = await client
+        .from("car_groups")
+        .update({ name: name.trim() })
+        .eq("id", groupId);
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      await fetchGroups();
+    },
+    [fetchGroups, getClient],
+  );
+
+  const deleteGroup = useCallback(
+    async (groupId: string) => {
+      const client = getClient();
+      if (!client) return;
+
+      const { error } = await client
+        .from("car_groups")
+        .delete()
+        .eq("id", groupId);
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      await fetchGroups();
+    },
+    [fetchGroups, getClient],
+  );
+
   const addCar = useCallback(
     async (car: {
       name: string;
@@ -1701,6 +1739,8 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     assignCarToGroups,
     reorderGroupsInList,
     moveGroupInList,
+    renameGroup,
+    deleteGroup,
     setAllowMultipleGroups,
     reorderCarsInList,
     moveCarInList,

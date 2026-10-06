@@ -11,6 +11,7 @@ import {
   ArrowDown,
   ChevronDown,
   Settings,
+  Pencil,
   Star,
   EyeOff,
   Eye,
@@ -45,6 +46,8 @@ interface Props {
   onPermanentlyDeleteCar: (id: string) => void;
   onAddGroup: (name: string) => void;
   onMoveGroup: (id: string, direction: "up" | "down") => void;
+  onRenameGroup: (id: string, name: string) => void;
+  onDeleteGroup: (id: string) => void;
   onAssignCarToGroups: (carId: string, groupIds: string[]) => void;
   onSetAllowMultipleGroups: (enabled: boolean) => void;
 }
@@ -69,6 +72,8 @@ export function Sidebar({
   onPermanentlyDeleteCar,
   onAddGroup,
   onMoveGroup,
+  onRenameGroup,
+  onDeleteGroup,
   onAssignCarToGroups,
   onSetAllowMultipleGroups,
 }: Props) {
@@ -78,6 +83,8 @@ export function Sidebar({
   const [collapsedGroups, setCollapsedGroups] = useState<string[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [editingGroupName, setEditingGroupName] = useState("");
   const [form, setForm] = useState({
     name: "",
     nickname: "",
@@ -202,6 +209,84 @@ export function Sidebar({
                 Add
               </button>
             </div>
+            {groups.length > 0 && (
+              <div className="space-y-1 border-t border-[#222] pt-2">
+                {groups.map((group) => (
+                  <div key={group.id} className="flex items-center gap-1">
+                    {editingGroupId === group.id ? (
+                      <input
+                        value={editingGroupName}
+                        onChange={(event) =>
+                          setEditingGroupName(event.target.value)
+                        }
+                        onKeyDown={(event) => {
+                          if (
+                            event.key === "Enter" &&
+                            editingGroupName.trim()
+                          ) {
+                            onRenameGroup(group.id, editingGroupName.trim());
+                            setEditingGroupId(null);
+                          }
+                          if (event.key === "Escape") setEditingGroupId(null);
+                        }}
+                        className="min-w-0 flex-1 rounded-md border border-[#333] bg-[#0b0b0b] px-2 py-1 text-xs text-white"
+                        autoFocus
+                      />
+                    ) : (
+                      <span className="min-w-0 flex-1 truncate text-xs text-gray-400">
+                        {group.name}
+                      </span>
+                    )}
+                    {editingGroupId === group.id ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (editingGroupName.trim()) {
+                            onRenameGroup(group.id, editingGroupName.trim());
+                            setEditingGroupId(null);
+                          }
+                        }}
+                        className="p-1 text-emerald-500 hover:text-emerald-300"
+                        aria-label={`Save ${group.name}`}
+                        title="Save group name"
+                      >
+                        <Check size={12} />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingGroupId(group.id);
+                          setEditingGroupName(group.name);
+                        }}
+                        className="p-1 text-gray-600 hover:text-gray-300"
+                        aria-label={`Rename ${group.name}`}
+                        title={`Rename ${group.name}`}
+                      >
+                        <Pencil size={12} />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `Delete ${group.name}? Builds in it will move to Uncategorized.`,
+                          )
+                        ) {
+                          onDeleteGroup(group.id);
+                        }
+                      }}
+                      className="p-1 text-gray-600 hover:text-red-400"
+                      aria-label={`Delete ${group.name}`}
+                      title={`Delete ${group.name}`}
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
         <div className="divide-y divide-[#1a1a1a]">
