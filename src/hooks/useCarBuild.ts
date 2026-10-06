@@ -704,6 +704,44 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     [allowMultipleGroups, getClient],
   );
 
+  const reorderGroupsInList = useCallback(
+    async (orderedGroupIds: string[]) => {
+      const client = getClient();
+      if (!client) return;
+
+      for (let index = 0; index < orderedGroupIds.length; index += 1) {
+        const { error } = await client
+          .from("car_groups")
+          .update({ display_order: index + 1 })
+          .eq("id", orderedGroupIds[index]);
+        if (error) {
+          setError(error.message);
+          return;
+        }
+      }
+
+      await fetchGroups();
+    },
+    [fetchGroups, getClient],
+  );
+
+  const moveGroupInList = useCallback(
+    async (groupId: string, direction: "up" | "down") => {
+      const currentIndex = groups.findIndex((group) => group.id === groupId);
+      if (currentIndex === -1) return;
+
+      const targetIndex =
+        direction === "up" ? currentIndex - 1 : currentIndex + 1;
+      if (targetIndex < 0 || targetIndex >= groups.length) return;
+
+      const reordered = groups.map((group) => group.id);
+      const [moved] = reordered.splice(currentIndex, 1);
+      reordered.splice(targetIndex, 0, moved);
+      await reorderGroupsInList(reordered);
+    },
+    [groups, reorderGroupsInList],
+  );
+
   const addCar = useCallback(
     async (car: {
       name: string;
@@ -1661,6 +1699,8 @@ export function useCarBuild(options: UseCarBuildOptions = {}) {
     duplicateCar,
     addGroup,
     assignCarToGroups,
+    reorderGroupsInList,
+    moveGroupInList,
     setAllowMultipleGroups,
     reorderCarsInList,
     moveCarInList,

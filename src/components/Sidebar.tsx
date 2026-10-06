@@ -44,6 +44,7 @@ interface Props {
   onRestoreCar: (id: string) => void;
   onPermanentlyDeleteCar: (id: string) => void;
   onAddGroup: (name: string) => void;
+  onMoveGroup: (id: string, direction: "up" | "down") => void;
   onAssignCarToGroups: (carId: string, groupIds: string[]) => void;
   onSetAllowMultipleGroups: (enabled: boolean) => void;
 }
@@ -67,6 +68,7 @@ export function Sidebar({
   onRestoreCar,
   onPermanentlyDeleteCar,
   onAddGroup,
+  onMoveGroup,
   onAssignCarToGroups,
   onSetAllowMultipleGroups,
 }: Props) {
@@ -207,45 +209,102 @@ export function Sidebar({
             const assignedGroupIds = carGroupIds[car.id] || [];
             const group = groups.find((item) => item.id === entryGroupId);
             const groupName = group?.name || "Uncategorized";
+            const groupIndex = group
+              ? groups.findIndex((item) => item.id === group.id)
+              : -1;
             const isFirstInGroup =
               carEntries.findIndex(
                 (entry) => entry.groupId === entryGroupId,
               ) === index;
             if (collapsedGroups.includes(entryGroupId)) {
               return isFirstInGroup ? (
-                <button
+                <div
                   key={`${car.id}-${entryGroupId}-collapsed`}
-                  type="button"
-                  onClick={() =>
-                    setCollapsedGroups((current) =>
-                      current.filter((id) => id !== entryGroupId),
-                    )
-                  }
-                  className="flex w-full items-center gap-2 bg-[#0d0d0d] px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-gray-500"
+                  className="flex items-center gap-2 bg-[#0d0d0d] px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-gray-500"
                 >
-                  <ChevronDown size={12} className="-rotate-90" />
-                  {groupName}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCollapsedGroups((current) =>
+                        current.filter((id) => id !== entryGroupId),
+                      )
+                    }
+                    className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                  >
+                    <ChevronDown size={12} className="-rotate-90" />
+                    <span className="truncate">{groupName}</span>
+                  </button>
+                  {group && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => onMoveGroup(group.id, "up")}
+                        disabled={groupIndex <= 0}
+                        className="p-0.5 text-gray-600 hover:text-gray-300 disabled:cursor-not-allowed disabled:opacity-30"
+                        aria-label={`Move ${groupName} up`}
+                        title={`Move ${groupName} up`}
+                      >
+                        <ArrowUp size={11} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onMoveGroup(group.id, "down")}
+                        disabled={groupIndex === groups.length - 1}
+                        className="p-0.5 text-gray-600 hover:text-gray-300 disabled:cursor-not-allowed disabled:opacity-30"
+                        aria-label={`Move ${groupName} down`}
+                        title={`Move ${groupName} down`}
+                      >
+                        <ArrowDown size={11} />
+                      </button>
+                    </div>
+                  )}
+                </div>
               ) : null;
             }
             const progress = getCarProgress(car.id);
             return (
               <Fragment key={`${car.id}-${entryGroupId}`}>
                 {isFirstInGroup && (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setCollapsedGroups((current) =>
-                        current.includes(entryGroupId)
-                          ? current.filter((id) => id !== entryGroupId)
-                          : [...current, entryGroupId],
-                      )
-                    }
-                    className="flex w-full items-center gap-2 bg-[#0d0d0d] px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-widest text-gray-500"
-                  >
-                    <ChevronDown size={12} className={""} />
-                    {groupName}
-                  </button>
+                  <div className="flex items-center gap-2 bg-[#0d0d0d] px-3 py-2 text-[10px] font-semibold uppercase tracking-widest text-gray-500">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCollapsedGroups((current) =>
+                          current.includes(entryGroupId)
+                            ? current.filter((id) => id !== entryGroupId)
+                            : [...current, entryGroupId],
+                        )
+                      }
+                      className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                    >
+                      <ChevronDown size={12} />
+                      <span className="truncate">{groupName}</span>
+                    </button>
+                    {group && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => onMoveGroup(group.id, "up")}
+                          disabled={groupIndex <= 0}
+                          className="p-0.5 text-gray-600 hover:text-gray-300 disabled:cursor-not-allowed disabled:opacity-30"
+                          aria-label={`Move ${groupName} up`}
+                          title={`Move ${groupName} up`}
+                        >
+                          <ArrowUp size={11} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onMoveGroup(group.id, "down")}
+                          disabled={groupIndex === groups.length - 1}
+                          className="p-0.5 text-gray-600 hover:text-gray-300 disabled:cursor-not-allowed disabled:opacity-30"
+                          aria-label={`Move ${groupName} down`}
+                          title={`Move ${groupName} down`}
+                        >
+                          <ArrowDown size={11} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )}
                 <div
                   key={car.id}

@@ -79,6 +79,7 @@ export default function App() {
     duplicateCar,
     addGroup,
     assignCarToGroups,
+    moveGroupInList,
     setAllowMultipleGroups,
     moveCarInList,
     addCategory,
@@ -603,6 +604,7 @@ export default function App() {
               onAddGroup={(name) => {
                 void addGroup(name);
               }}
+              onMoveGroup={moveGroupInList}
               onAssignCarToGroups={assignCarToGroups}
               onSetAllowMultipleGroups={setAllowMultipleGroups}
             />
@@ -660,6 +662,7 @@ export default function App() {
               onAddGroup={(name) => {
                 void addGroup(name);
               }}
+              onMoveGroup={moveGroupInList}
               onAssignCarToGroups={assignCarToGroups}
               onSetAllowMultipleGroups={setAllowMultipleGroups}
             />
