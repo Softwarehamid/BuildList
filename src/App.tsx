@@ -56,6 +56,14 @@ export default function App() {
   const [password, setPassword] = useState("");
   const [authSubmitting, setAuthSubmitting] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [showRecentlyDeleted, setShowRecentlyDeletedState] = useState(
+    () => localStorage.getItem("buildlist.showRecentlyDeleted") !== "false",
+  );
+
+  const setShowRecentlyDeleted = (enabled: boolean) => {
+    setShowRecentlyDeletedState(enabled);
+    localStorage.setItem("buildlist.showRecentlyDeleted", String(enabled));
+  };
 
   const {
     cars,
@@ -589,6 +597,7 @@ export default function App() {
               cars={cars}
               hiddenCars={hiddenCars}
               deletedCars={deletedCars}
+              showRecentlyDeleted={showRecentlyDeleted}
               groups={groups}
               carGroupIds={carGroupIds}
               allowMultipleGroups={allowMultipleGroups}
@@ -611,6 +620,7 @@ export default function App() {
               onDeleteGroup={deleteGroup}
               onAssignCarToGroups={assignCarToGroups}
               onSetAllowMultipleGroups={setAllowMultipleGroups}
+              onSetShowRecentlyDeleted={setShowRecentlyDeleted}
             />
           </div>
         </div>
@@ -649,6 +659,7 @@ export default function App() {
               cars={cars}
               hiddenCars={hiddenCars}
               deletedCars={deletedCars}
+              showRecentlyDeleted={showRecentlyDeleted}
               groups={groups}
               carGroupIds={carGroupIds}
               allowMultipleGroups={allowMultipleGroups}
@@ -671,6 +682,7 @@ export default function App() {
               onDeleteGroup={deleteGroup}
               onAssignCarToGroups={assignCarToGroups}
               onSetAllowMultipleGroups={setAllowMultipleGroups}
+              onSetShowRecentlyDeleted={setShowRecentlyDeleted}
             />
           </div>
 

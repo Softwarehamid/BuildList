@@ -26,6 +26,7 @@ interface Props {
   cars: CarType[];
   hiddenCars: CarType[];
   deletedCars: CarType[];
+  showRecentlyDeleted: boolean;
   groups: CarGroup[];
   carGroupIds: Record<string, string[]>;
   allowMultipleGroups: boolean;
@@ -50,12 +51,14 @@ interface Props {
   onDeleteGroup: (id: string) => void;
   onAssignCarToGroups: (carId: string, groupIds: string[]) => void;
   onSetAllowMultipleGroups: (enabled: boolean) => void;
+  onSetShowRecentlyDeleted: (enabled: boolean) => void;
 }
 
 export function Sidebar({
   cars,
   hiddenCars,
   deletedCars,
+  showRecentlyDeleted,
   groups,
   carGroupIds,
   allowMultipleGroups,
@@ -76,6 +79,7 @@ export function Sidebar({
   onDeleteGroup,
   onAssignCarToGroups,
   onSetAllowMultipleGroups,
+  onSetShowRecentlyDeleted,
 }: Props) {
   const [adding, setAdding] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<CarType | null>(null);
@@ -188,6 +192,16 @@ export function Sidebar({
                 }
               />
               Allow cars in multiple groups
+            </label>
+            <label className="flex items-center gap-2 text-xs text-gray-400">
+              <input
+                type="checkbox"
+                checked={showRecentlyDeleted}
+                onChange={(event) =>
+                  onSetShowRecentlyDeleted(event.target.checked)
+                }
+              />
+              Show Recently Deleted
             </label>
             <div className="flex gap-2">
               <input
@@ -524,7 +538,7 @@ export function Sidebar({
         </div>
       </div>
 
-      {deletedCars.length > 0 && (
+      {showRecentlyDeleted && deletedCars.length > 0 && (
         <div className="bg-[#111111] border border-[#352020] rounded-xl overflow-hidden">
           <div className="px-3 py-2 border-b border-[#241818] flex items-center justify-between">
             <span className="text-[10px] uppercase tracking-widest text-red-400 font-semibold">
