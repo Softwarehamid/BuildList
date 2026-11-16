@@ -59,10 +59,17 @@ export default function App() {
   const [showRecentlyDeleted, setShowRecentlyDeletedState] = useState(
     () => localStorage.getItem("buildlist.showRecentlyDeleted") !== "false",
   );
+  const [showHiddenBuilds, setShowHiddenBuildsState] = useState(
+    () => localStorage.getItem("buildlist.showHiddenBuilds") === "true",
+  );
 
   const setShowRecentlyDeleted = (enabled: boolean) => {
     setShowRecentlyDeletedState(enabled);
     localStorage.setItem("buildlist.showRecentlyDeleted", String(enabled));
+  };
+  const setShowHiddenBuilds = (enabled: boolean) => {
+    setShowHiddenBuildsState(enabled);
+    localStorage.setItem("buildlist.showHiddenBuilds", String(enabled));
   };
 
   const {
@@ -597,6 +604,7 @@ export default function App() {
               cars={cars}
               hiddenCars={hiddenCars}
               deletedCars={deletedCars}
+              showHiddenBuilds={showHiddenBuilds}
               showRecentlyDeleted={showRecentlyDeleted}
               groups={groups}
               carGroupIds={carGroupIds}
@@ -620,6 +628,7 @@ export default function App() {
               onDeleteGroup={deleteGroup}
               onAssignCarToGroups={assignCarToGroups}
               onSetAllowMultipleGroups={setAllowMultipleGroups}
+              onSetShowHiddenBuilds={setShowHiddenBuilds}
               onSetShowRecentlyDeleted={setShowRecentlyDeleted}
             />
           </div>
@@ -659,6 +668,7 @@ export default function App() {
               cars={cars}
               hiddenCars={hiddenCars}
               deletedCars={deletedCars}
+              showHiddenBuilds={showHiddenBuilds}
               showRecentlyDeleted={showRecentlyDeleted}
               groups={groups}
               carGroupIds={carGroupIds}
@@ -682,6 +692,7 @@ export default function App() {
               onDeleteGroup={deleteGroup}
               onAssignCarToGroups={assignCarToGroups}
               onSetAllowMultipleGroups={setAllowMultipleGroups}
+              onSetShowHiddenBuilds={setShowHiddenBuilds}
               onSetShowRecentlyDeleted={setShowRecentlyDeleted}
             />
           </div>

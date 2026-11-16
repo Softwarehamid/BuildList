@@ -26,6 +26,7 @@ interface Props {
   cars: CarType[];
   hiddenCars: CarType[];
   deletedCars: CarType[];
+  showHiddenBuilds: boolean;
   showRecentlyDeleted: boolean;
   groups: CarGroup[];
   carGroupIds: Record<string, string[]>;
@@ -51,6 +52,7 @@ interface Props {
   onDeleteGroup: (id: string) => void;
   onAssignCarToGroups: (carId: string, groupIds: string[]) => void;
   onSetAllowMultipleGroups: (enabled: boolean) => void;
+  onSetShowHiddenBuilds: (enabled: boolean) => void;
   onSetShowRecentlyDeleted: (enabled: boolean) => void;
 }
 
@@ -58,6 +60,7 @@ export function Sidebar({
   cars,
   hiddenCars,
   deletedCars,
+  showHiddenBuilds,
   showRecentlyDeleted,
   groups,
   carGroupIds,
@@ -79,6 +82,7 @@ export function Sidebar({
   onDeleteGroup,
   onAssignCarToGroups,
   onSetAllowMultipleGroups,
+  onSetShowHiddenBuilds,
   onSetShowRecentlyDeleted,
 }: Props) {
   const [adding, setAdding] = useState(false);
@@ -136,7 +140,7 @@ export function Sidebar({
         </span>
       </div>
 
-      {hiddenCars.length > 0 && (
+      {showHiddenBuilds && hiddenCars.length > 0 && (
         <div className="bg-[#111111] border border-[#242424] rounded-xl overflow-hidden">
           <div className="px-3 py-2 border-b border-[#1a1a1a] flex items-center justify-between">
             <span className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">
@@ -202,6 +206,16 @@ export function Sidebar({
                 }
               />
               Show Recently Deleted
+            </label>
+            <label className="flex items-center gap-2 text-xs text-gray-400">
+              <input
+                type="checkbox"
+                checked={showHiddenBuilds}
+                onChange={(event) =>
+                  onSetShowHiddenBuilds(event.target.checked)
+                }
+              />
+              Show Hidden Builds
             </label>
             <div className="flex gap-2">
               <input
